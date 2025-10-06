@@ -1,3 +1,4 @@
+// src/screens/SignupScreen.js
 import React, { useState } from 'react';
 import {
   View,
@@ -5,32 +6,52 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { signUp } from '../services/authService';
 
 export default function SignupScreen({ navigation }) {
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // メールアドレスのバリデーション
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
+  // パスワードのバリデーション
   const validatePassword = (password) => {
-    // 8文字以上、英数字を含む
-    return password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+    // 6文字以上
+    if (password.length < 6) {
+      return { valid: false, message: 'パスワードは6文字以上で設定してください' };
+    }
+    // 英数字を含む（より強固にする場合）
+    // const hasNumber = /\d/.test(password);
+    // const hasLetter = /[a-zA-Z]/.test(password);
+    // if (!hasNumber || !hasLetter) {
+    //   return { valid: false, message: 'パスワードは英字と数字を含めてください' };
+    // }
+    return { valid: true };
   };
 
+  // サインアップ処理
   const handleSignup = async () => {
     // バリデーション
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('エラー', 'すべての項目を入力してください');
+    if (!displayName.trim()) {
+      Alert.alert('エラー', '名前を入力してください');
+      return;
+    }
+
+    if (!email.trim()) {
+      Alert.alert('エラー', 'メールアドレスを入力してください');
       return;
     }
 
@@ -39,11 +60,14 @@ export default function SignupScreen({ navigation }) {
       return;
     }
 
-    if (!validatePassword(password)) {
-      Alert.alert(
-        'エラー',
-        'パスワードは8文字以上で、英字と数字を含む必要があります'
-      );
+    if (!password) {
+      Alert.alert('エラー', 'パスワードを入力してください');
+      return;
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('エラー', passwordValidation.message);
       return;
     }
 
@@ -52,9 +76,18 @@ export default function SignupScreen({ navigation }) {
       return;
     }
 
-    // 明日実装する認証処理
-    console.log('サインアップ処理', { email, password });
-    Alert.alert('開発中', 'サインアップ機能は明日実装します！');
+    setLoading(true);
+
+    try {
+      await signUp(email.trim(), password, displayName.trim());
+      // 成功時は自動的にAuthContextが更新され、ナビゲーションが切り替わる
+      console.log('Signup successful');
+      Alert.alert('成功', 'アカウントが作成されました！');
+    } catch (error) {
+      Alert.alert('登録失敗', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -62,85 +95,96 @@ export default function SignupScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.content}>
-          {/* ヘッダー */}
-          <View style={styles.header}>
-            <Text style={styles.title}>アカウント作成</Text>
-            <Text style={styles.subtitle}>
-              練習履歴を保存して成長を記録しましょう
-            </Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.innerContainer}>
+          {/* タイトル */}
+          <Text style={styles.title}>新規登録</Text>
+          <Text style={styles.subtitle}>アカウントを作成して練習を記録しましょう</Text>
+
+          {/* 名前入力 */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>名前</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="山田太郎"
+              value={displayName}
+              onChangeText={setDisplayName}
+              autoCapitalize="words"
+              editable={!loading}
+            />
           </View>
 
-          {/* フォーム */}
-          <View style={styles.form}>
+          {/* メールアドレス入力 */}
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>メールアドレス</Text>
             <TextInput
               style={styles.input}
               placeholder="example@email.com"
-              placeholderTextColor="#999"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!loading}
             />
+          </View>
 
+          {/* パスワード入力 */}
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>パスワード</Text>
-            <Text style={styles.hint}>8文字以上、英数字を含む</Text>
             <TextInput
               style={styles.input}
-              placeholder="パスワードを入力"
-              placeholderTextColor="#999"
+              placeholder="6文字以上"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
+              editable={!loading}
+              textContentType="none"
+              autoComplete="off"
             />
+          </View>
 
+          {/* パスワード確認入力 */}
+          <View style={styles.inputContainer}>
             <Text style={styles.label}>パスワード（確認）</Text>
             <TextInput
               style={styles.input}
-              placeholder="もう一度入力"
-              placeholderTextColor="#999"
+              placeholder="もう一度入力してください"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
               autoCapitalize="none"
+              editable={!loading}
+              textContentType="none"
+              autoComplete="off"
             />
-
-            {/* サインアップボタン */}
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
-              onPress={handleSignup}
-              disabled={loading}
-            >
-              <Text style={styles.primaryButtonText}>
-                {loading ? '登録中...' : '登録する'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* ログインリンク */}
-            <TouchableOpacity
-              style={styles.linkContainer}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.linkText}>
-                すでにアカウントをお持ちの方は
-                <Text style={styles.linkBold}> ログイン</Text>
-              </Text>
-            </TouchableOpacity>
           </View>
 
-          {/* 注意事項 */}
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              💡 アカウント登録すると以下のメリットがあります：
+          {/* 登録ボタン */}
+          <TouchableOpacity
+            style={[styles.signupButton, loading && styles.disabledButton]}
+            onPress={handleSignup}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.signupButtonText}>登録</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* ログインリンク */}
+          <TouchableOpacity
+            style={styles.loginLink}
+            onPress={() => navigation.navigate('Login')}
+            disabled={loading}
+          >
+            <Text style={styles.loginLinkText}>
+              既にアカウントをお持ちの方は
+              <Text style={styles.loginLinkTextBold}> ログイン</Text>
             </Text>
-            <Text style={styles.noticeItem}>• 練習履歴の保存</Text>
-            <Text style={styles.noticeItem}>• 成長の追跡</Text>
-            <Text style={styles.noticeItem}>• 複数デバイスでの利用</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -150,108 +194,71 @@ export default function SignupScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f5f5f5',
   },
-  scrollContainer: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  innerContainer: {
+    flex: 1,
     justifyContent: 'center',
     padding: 20,
   },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: '#333',
     textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    marginTop: 10,
     textAlign: 'center',
+    marginBottom: 40,
   },
-  form: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  inputContainer: {
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 16,
-  },
-  hint: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
-    marginTop: -4,
   },
   input: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  button: {
+    borderColor: '#ddd',
     borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
+    padding: 12,
     fontSize: 16,
-    fontWeight: '600',
   },
-  linkContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  linkText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  linkBold: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  notice: {
-    backgroundColor: '#E8F4FF',
-    borderRadius: 12,
+  signupButton: {
+    backgroundColor: '#2196F3',
     padding: 16,
-    marginTop: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
   },
-  noticeText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 12,
-    fontWeight: '600',
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
-  noticeItem: {
+  signupButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loginLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loginLinkText: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
-    marginLeft: 8,
+  },
+  loginLinkTextBold: {
+    color: '#2196F3',
+    fontWeight: 'bold',
   },
 });
