@@ -1,66 +1,75 @@
 // src/screens/HomeScreen.js
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity,
+  ScrollView  // ScrollViewを追加
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';  // こちらからインポート
 import { useAuth } from '../contexts/AuthContext';
 
 export default function HomeScreen({ navigation }) {
   const { user, isGuest } = useAuth();
 
   return (
-    <View style={styles.container}>
-      <View style={styles.welcomeSection}>
-        <Text style={styles.title}>
-          ようこそ、{isGuest ? 'ゲスト' : user?.displayName || 'ユーザー'}さん！
-        </Text>
-        <Text style={styles.subtitle}>
-          ビジネスコミュニケーションスキルを磨きましょう
-        </Text>
-      </View>
-
-      <TouchableOpacity 
-        style={styles.startButton}
-        onPress={() => {
-          // TODO: Day 5で場面選択画面への遷移を実装
-          alert('場面選択画面は Day 5 で実装します');
-        }}
-      >
-        <Text style={styles.startButtonText}>練習を始める</Text>
-      </TouchableOpacity>
-
-      {isGuest && (
-        <View style={styles.guestNotice}>
-          <Text style={styles.guestNoticeText}>
-            ⚠️ ゲストモードでは練習履歴が保存されません
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.welcomeSection}>
+          <Text style={styles.title}>
+            ようこそ、{isGuest ? 'ゲスト' : user?.displayName || 'ユーザー'}さん！
           </Text>
-          <Text style={styles.guestNoticeSubtext}>
-            アカウント登録で履歴を記録できます
+          <Text style={styles.subtitle}>
+            ビジネスコミュニケーションスキルを磨きましょう
           </Text>
         </View>
-      )}
 
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>このアプリについて</Text>
-        <Text style={styles.infoText}>
-          4つのビジネスシーンで練習できます：
-        </Text>
-        <Text style={styles.infoItem}>📊 週次報告会議</Text>
-        <Text style={styles.infoItem}>💡 プロジェクト提案</Text>
-        <Text style={styles.infoItem}>🔧 問題解決の議論</Text>
-        <Text style={styles.infoItem}>🎯 顧客へのプレゼン</Text>
-      </View>
-    </View>
+        <TouchableOpacity 
+          style={styles.startButton}
+          onPress={() => {
+            // SceneSelectionScreenへ遷移
+            navigation.navigate('SceneSelection');
+          }}
+        >
+          <Text style={styles.startButtonText}>練習を始める</Text>
+        </TouchableOpacity>
+
+        {isGuest && (
+          <View style={styles.guestNotice}>
+            <Text style={styles.guestNoticeText}>
+              ⚠️ ゲストモードでは練習履歴が保存されません
+            </Text>
+            <Text style={styles.guestNoticeSubtext}>
+              アカウント登録で履歴を記録できます
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>このアプリについて</Text>
+          <Text style={styles.infoText}>
+            4つのビジネスシーンで練習できます：
+          </Text>
+          <Text style={styles.infoItem}>📊 週次報告会議</Text>
+          <Text style={styles.infoItem}>💡 プロジェクト提案</Text>
+          <Text style={styles.infoItem}>🔧 問題解決の議論</Text>
+          <Text style={styles.infoItem}>🎯 顧客へのプレゼン</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2196F3',  // 上部の色を青に
   },
   welcomeSection: {
     backgroundColor: '#2196F3',
     padding: 30,
-    paddingTop: 40,
+    paddingTop: 20,
     paddingBottom: 40,
   },
   title: {
