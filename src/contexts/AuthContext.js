@@ -8,6 +8,7 @@ export const AuthContext = createContext({
   loading: true,
   isGuest: false,
   setIsGuest: () => {},
+  logout: () => {},
 });
 
 // カスタムフック: 認証状態を簡単に取得
@@ -42,11 +43,31 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  // ログアウト関数：認証状態とゲストモードをリセット
+  const logout = async () => {
+    try {
+      // Firebaseからログアウト（ユーザーがログインしている場合）
+      if (user) {
+        const { logOut } = require('../services/authService');
+        await logOut();
+      }
+      // ゲストモードもリセット
+      setIsGuest(false);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもゲストモードはリセット
+      setIsGuest(false);
+      setUser(null);
+    }
+  };
+
   const value = {
     user,
     loading,
     isGuest,
     setIsGuest,
+    logout,
   };
 
   return (
