@@ -2,7 +2,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { subscribeToAuthChanges } from '../services/authService';
 
-// Contextの作成
+// 認証情報をグローバルに共有するためのContextの作成
 export const AuthContext = createContext({
   user: null,
   loading: true,

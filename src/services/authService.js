@@ -1,4 +1,5 @@
 // src/services/authService.js
+//Firebaseの認証機能を「使いやすい関数群」にラップして、UI側（画面側）からシンプルに呼び出せるようにしたファイル
 import { 
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,

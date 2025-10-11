@@ -174,7 +174,7 @@ export default function FeedbackScreen({ navigation, route }) {
   );
 }
 
-// スタイルは変更なし（省略）
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

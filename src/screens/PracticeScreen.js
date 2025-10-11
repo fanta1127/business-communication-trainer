@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/SessionContext';
+import VoiceRecorder from '../components/VoiceRecorder';
 
 export default function PracticeScreen({ navigation, route }) {
   const { scene } = route.params || {};
@@ -26,6 +27,7 @@ export default function PracticeScreen({ navigation, route }) {
 
   const [answer, setAnswer] = useState('');
   const [startTime, setStartTime] = useState(Date.now());
+  const [audioUri, setAudioUri] = useState(null);
 
   // 現在の質問を取得
   const currentQuestion = getCurrentQuestion();
@@ -36,7 +38,19 @@ export default function PracticeScreen({ navigation, route }) {
     // 質問が変わったらタイマーをリセット
     setStartTime(Date.now());
     setAnswer('');
+    setAudioUri(null);
   }, [currentQuestionIndex]);
+
+  /**
+   * 音声録音完了時の処理
+   */
+  const handleRecordingComplete = (uri, duration) => {
+    setAudioUri(uri);
+    console.log('録音完了:', { uri, duration });
+    
+    // テキスト入力にフォーカスを促す
+    // 将来的にここで音声認識APIを呼び出す
+  };
 
   /**
    * 次へボタンの処理
@@ -50,7 +64,7 @@ export default function PracticeScreen({ navigation, route }) {
     // 回答時間を計算（秒）
     const duration = Math.floor((Date.now() - startTime) / 1000);
     
-    // 回答を保存
+    // 回答を保存（将来的にはaudioUriも保存）
     saveAnswer(answer.trim(), duration);
 
     // 次の質問へ移動
@@ -58,7 +72,6 @@ export default function PracticeScreen({ navigation, route }) {
     
     if (!hasNext) {
       // 全質問完了
-      // 現時点では固定質問のみなので、AI質問生成画面へ（後で実装）
       Alert.alert(
         '質問回答完了',
         '固定質問への回答が完了しました。AI質問生成機能は後日実装予定です。',
@@ -149,6 +162,12 @@ export default function PracticeScreen({ navigation, route }) {
           </Text>
         </View>
 
+        {/* 音声録音コンポーネント */}
+        <VoiceRecorder
+          onRecordingComplete={handleRecordingComplete}
+          disabled={false}
+        />
+
         <View style={styles.answerSection}>
           <Text style={styles.answerLabel}>あなたの回答</Text>
           <TextInput
@@ -162,13 +181,6 @@ export default function PracticeScreen({ navigation, route }) {
           />
           <Text style={styles.charCount}>{answer.length} 文字</Text>
         </View>
-
-        <TouchableOpacity style={styles.voiceButton} disabled>
-          <Text style={styles.voiceButtonIcon}>🎤</Text>
-          <Text style={styles.voiceButtonText}>
-            音声で回答（Day 6で実装予定）
-          </Text>
-        </TouchableOpacity>
 
         <View style={styles.tip}>
           <Text style={styles.tipIcon}>💡</Text>
@@ -303,27 +315,6 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'right',
     marginTop: 8,
-  },
-  voiceButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
-    opacity: 0.5,
-  },
-  voiceButtonIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  voiceButtonText: {
-    fontSize: 16,
-    color: '#666',
   },
   tip: {
     flexDirection: 'row',
