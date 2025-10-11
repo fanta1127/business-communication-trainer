@@ -1,5 +1,5 @@
 // src/screens/PracticeScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,60 +10,111 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSession } from '../contexts/SessionContext';
 
 export default function PracticeScreen({ navigation, route }) {
   const { scene } = route.params || {};
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const {
+    currentSession,
+    currentQuestionIndex,
+    getCurrentQuestion,
+    saveAnswer,
+    moveToNextQuestion,
+    getProgress,
+    resetSession,
+  } = useSession();
+
   const [answer, setAnswer] = useState('');
-  const [answers, setAnswers] = useState([]);
+  const [startTime, setStartTime] = useState(Date.now());
 
-  // 仮の質問データ（後でAIが生成）
-  const questions = [
-    '今週の進捗状況と、現在直面している課題を具体的に説明してください',
-    'その課題に対して、どのような対策を考えていますか？',
-    'チームメンバーとの連携はうまくいっていますか？',
-  ];
+  // 現在の質問を取得
+  const currentQuestion = getCurrentQuestion();
+  const progress = getProgress();
+  const totalQuestions = currentSession?.totalQuestions || 1;
 
-  const totalQuestions = questions.length;
-  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+  useEffect(() => {
+    // 質問が変わったらタイマーをリセット
+    setStartTime(Date.now());
+    setAnswer('');
+  }, [currentQuestionIndex]);
 
+  /**
+   * 次へボタンの処理
+   */
   const handleNext = () => {
     if (answer.trim() === '') {
       Alert.alert('エラー', '回答を入力してください');
       return;
     }
 
+    // 回答時間を計算（秒）
+    const duration = Math.floor((Date.now() - startTime) / 1000);
+    
     // 回答を保存
-    const newAnswers = [...answers, { question: questions[currentQuestionIndex], answer }];
-    setAnswers(newAnswers);
-    setAnswer('');
+    saveAnswer(answer.trim(), duration);
 
-    if (currentQuestionIndex < totalQuestions - 1) {
-      // 次の質問へ
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    // 次の質問へ移動
+    const hasNext = moveToNextQuestion();
+    
+    if (!hasNext) {
+      // 全質問完了
+      // 現時点では固定質問のみなので、AI質問生成画面へ（後で実装）
+      Alert.alert(
+        '質問回答完了',
+        '固定質問への回答が完了しました。AI質問生成機能は後日実装予定です。',
+        [
+          {
+            text: 'ホームに戻る',
+            onPress: () => {
+              resetSession();
+              navigation.navigate('Home');
+            },
+          },
+        ]
+      );
     } else {
-      // 全質問完了 → フィードバック画面へ
-      navigation.navigate('Feedback', { 
-        scene, 
-        answers: newAnswers 
-      });
+      // 次の質問があるのでanswerをクリア
+      setAnswer('');
     }
   };
 
+  /**
+   * セッション終了の確認
+   */
   const handleEndSession = () => {
     Alert.alert(
       'セッションを終了',
-      '練習を中断してもよろしいですか？',
+      '練習を中断してもよろしいですか？進捗は保存されません。',
       [
         { text: 'キャンセル', style: 'cancel' },
-        { 
-          text: '終了する', 
+        {
+          text: '終了する',
           style: 'destructive',
-          onPress: () => navigation.navigate('Home')
+          onPress: () => {
+            resetSession();
+            navigation.navigate('Home');
+          },
         },
       ]
     );
   };
+
+  // セッションがない場合の処理
+  if (!currentSession || !currentQuestion) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>セッションが見つかりません</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Text style={styles.backButtonText}>ホームに戻る</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -88,9 +139,13 @@ export default function PracticeScreen({ navigation, route }) {
         </View>
 
         <View style={styles.questionCard}>
-          <Text style={styles.questionLabel}>質問</Text>
+          <View style={styles.questionHeader}>
+            <Text style={styles.questionLabel}>
+              {currentQuestion.isFixedQuestion ? '📌 固定質問' : '🤖 AI質問'}
+            </Text>
+          </View>
           <Text style={styles.questionText}>
-            {questions[currentQuestionIndex]}
+            {currentQuestion.questionText}
           </Text>
         </View>
 
@@ -105,20 +160,30 @@ export default function PracticeScreen({ navigation, route }) {
             numberOfLines={6}
             textAlignVertical="top"
           />
-          <Text style={styles.charCount}>
-            {answer.length} 文字
-          </Text>
+          <Text style={styles.charCount}>{answer.length} 文字</Text>
         </View>
 
-        <TouchableOpacity style={styles.voiceButton}>
+        <TouchableOpacity style={styles.voiceButton} disabled>
           <Text style={styles.voiceButtonIcon}>🎤</Text>
-          <Text style={styles.voiceButtonText}>音声で回答（後で実装）</Text>
+          <Text style={styles.voiceButtonText}>
+            音声で回答（Day 6で実装予定）
+          </Text>
         </TouchableOpacity>
+
+        <View style={styles.tip}>
+          <Text style={styles.tipIcon}>💡</Text>
+          <Text style={styles.tipText}>
+            具体的な数値や事例を含めると、より効果的な練習になります
+          </Text>
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.nextButton, !answer.trim() && styles.nextButtonDisabled]}
+          style={[
+            styles.nextButton,
+            !answer.trim() && styles.nextButtonDisabled,
+          ]}
           onPress={handleNext}
           disabled={!answer.trim()}
         >
@@ -199,10 +264,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  questionHeader: {
+    marginBottom: 12,
+  },
   questionLabel: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
+    color: '#2196F3',
     fontWeight: 'bold',
   },
   questionText: {
@@ -248,6 +315,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#e0e0e0',
     borderStyle: 'dashed',
+    opacity: 0.5,
   },
   voiceButtonIcon: {
     fontSize: 24,
@@ -256,6 +324,23 @@ const styles = StyleSheet.create({
   voiceButtonText: {
     fontSize: 16,
     color: '#666',
+  },
+  tip: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF9E6',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  tipIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
   footer: {
     backgroundColor: '#fff',
@@ -273,6 +358,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    padding: 16,
+    paddingHorizontal: 32,
+  },
+  backButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
