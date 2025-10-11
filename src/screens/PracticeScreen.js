@@ -8,10 +8,18 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/SessionContext';
 import VoiceRecorder from '../components/VoiceRecorder';
+
+// 定数定義
+const MIN_ANSWER_LENGTH = 10;
+const MAX_ANSWER_LENGTH = 2000;
+const WARNING_ANSWER_LENGTH = 1500;
 
 export default function PracticeScreen({ navigation, route }) {
   const { scene } = route.params || {};
@@ -28,11 +36,18 @@ export default function PracticeScreen({ navigation, route }) {
   const [answer, setAnswer] = useState('');
   const [startTime, setStartTime] = useState(Date.now());
   const [audioUri, setAudioUri] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // 現在の質問を取得
   const currentQuestion = getCurrentQuestion();
   const progress = getProgress();
   const totalQuestions = currentSession?.totalQuestions || 1;
+
+  // 文字数の状態を計算
+  const answerLength = answer.length;
+  const isAnswerTooLong = answerLength > MAX_ANSWER_LENGTH;
+  const isAnswerNearLimit = answerLength >= WARNING_ANSWER_LENGTH;
+  const isAnswerTooShort = answerLength > 0 && answerLength < MIN_ANSWER_LENGTH;
 
   useEffect(() => {
     // 質問が変わったらタイマーをリセット
@@ -40,6 +55,37 @@ export default function PracticeScreen({ navigation, route }) {
     setAnswer('');
     setAudioUri(null);
   }, [currentQuestionIndex]);
+
+  /**
+   * 回答のバリデーション
+   * @returns {Object} { isValid: boolean, message: string }
+   */
+  const validateAnswer = () => {
+    const trimmedAnswer = answer.trim();
+
+    if (trimmedAnswer === '') {
+      return {
+        isValid: false,
+        message: '回答を入力してください',
+      };
+    }
+
+    if (trimmedAnswer.length < MIN_ANSWER_LENGTH) {
+      return {
+        isValid: false,
+        message: `回答は${MIN_ANSWER_LENGTH}文字以上入力してください（現在: ${trimmedAnswer.length}文字）`,
+      };
+    }
+
+    if (trimmedAnswer.length > MAX_ANSWER_LENGTH) {
+      return {
+        isValid: false,
+        message: `回答は${MAX_ANSWER_LENGTH}文字以内にしてください（現在: ${trimmedAnswer.length}文字）`,
+      };
+    }
+
+    return { isValid: true, message: '' };
+  };
 
   /**
    * 音声録音完了時の処理
@@ -55,39 +101,60 @@ export default function PracticeScreen({ navigation, route }) {
   /**
    * 次へボタンの処理
    */
-  const handleNext = () => {
-    if (answer.trim() === '') {
-      Alert.alert('エラー', '回答を入力してください');
+  const handleNext = async () => {
+    // バリデーション
+    const validation = validateAnswer();
+    if (!validation.isValid) {
+      Alert.alert('入力エラー', validation.message);
       return;
     }
 
-    // 回答時間を計算（秒）
-    const duration = Math.floor((Date.now() - startTime) / 1000);
-    
-    // 回答を保存（将来的にはaudioUriも保存）
-    saveAnswer(answer.trim(), duration);
+    setIsProcessing(true);
 
-    // 次の質問へ移動
-    const hasNext = moveToNextQuestion();
-    
-    if (!hasNext) {
-      // 全質問完了
-      Alert.alert(
-        '質問回答完了',
-        '固定質問への回答が完了しました。AI質問生成機能は後日実装予定です。',
-        [
-          {
-            text: 'ホームに戻る',
-            onPress: () => {
-              resetSession();
-              navigation.navigate('Home');
+    try {
+      // 回答時間を計算（秒）
+      const duration = Math.floor((Date.now() - startTime) / 1000);
+      
+      // 回答を保存（将来的にはaudioUriも保存）
+      saveAnswer(answer.trim(), duration);
+
+      // 次の質問へ移動
+      const hasNext = moveToNextQuestion();
+      
+      if (!hasNext) {
+        // 全質問完了
+        Alert.alert(
+          '固定質問完了',
+          'お疲れ様でした！固定質問への回答が完了しました。\n\nAI質問生成機能は Week 2（Day 8-9）で実装予定です。',
+          [
+            {
+              text: 'ホームに戻る',
+              onPress: () => {
+                resetSession();
+                navigation.navigate('Home');
+              },
             },
-          },
-        ]
+            {
+              text: 'もう一度練習',
+              onPress: () => {
+                resetSession();
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      } else {
+        // 次の質問があるのでanswerをクリア
+        setAnswer('');
+      }
+    } catch (error) {
+      console.error('回答保存エラー:', error);
+      Alert.alert(
+        'エラー',
+        '回答の保存に失敗しました。もう一度お試しください。'
       );
-    } else {
-      // 次の質問があるのでanswerをクリア
-      setAnswer('');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -97,7 +164,7 @@ export default function PracticeScreen({ navigation, route }) {
   const handleEndSession = () => {
     Alert.alert(
       'セッションを終了',
-      '練習を中断してもよろしいですか？進捗は保存されません。',
+      '練習を中断してもよろしいですか？\n\n現在の進捗は保存されません。',
       [
         { text: 'キャンセル', style: 'cancel' },
         {
@@ -110,6 +177,32 @@ export default function PracticeScreen({ navigation, route }) {
         },
       ]
     );
+  };
+
+  /**
+   * 回答文字数の色を取得
+   */
+  const getCharCountColor = () => {
+    if (isAnswerTooLong) return '#FF5252';
+    if (isAnswerNearLimit) return '#FF9800';
+    if (isAnswerTooShort) return '#FF9800';
+    return '#999';
+  };
+
+  /**
+   * 文字数の表示テキストを取得
+   */
+  const getCharCountText = () => {
+    if (isAnswerTooLong) {
+      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（超過）`;
+    }
+    if (isAnswerNearLimit) {
+      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（残り${MAX_ANSWER_LENGTH - answerLength}）`;
+    }
+    if (isAnswerTooShort && answerLength > 0) {
+      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（最低${MIN_ANSWER_LENGTH}文字）`;
+    }
+    return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字`;
   };
 
   // セッションがない場合の処理
@@ -131,79 +224,101 @@ export default function PracticeScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>
-            質問 {currentQuestionIndex + 1} / {totalQuestions}
-          </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.header}>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>
+              質問 {currentQuestionIndex + 1} / {totalQuestions}
+            </Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${progress}%` }]} />
+            </View>
           </View>
-        </View>
-        <TouchableOpacity onPress={handleEndSession} style={styles.endButton}>
-          <Text style={styles.endButtonText}>終了</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.sceneInfo}>
-          <Text style={styles.sceneIcon}>{scene?.icon || '📊'}</Text>
-          <Text style={styles.sceneName}>{scene?.name || '練習中'}</Text>
+          <TouchableOpacity onPress={handleEndSession} style={styles.endButton}>
+            <Text style={styles.endButtonText}>終了</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.questionCard}>
-          <View style={styles.questionHeader}>
-            <Text style={styles.questionLabel}>
-              {currentQuestion.isFixedQuestion ? '📌 固定質問' : '🤖 AI質問'}
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.sceneInfo}>
+            <Text style={styles.sceneIcon}>{scene?.icon || '📊'}</Text>
+            <Text style={styles.sceneName}>{scene?.name || '練習中'}</Text>
+          </View>
+
+          <View style={styles.questionCard}>
+            <View style={styles.questionHeader}>
+              <Text style={styles.questionLabel}>
+                {currentQuestion.isFixedQuestion ? '📌 固定質問' : '🤖 AI質問'}
+              </Text>
+            </View>
+            <Text style={styles.questionText}>
+              {currentQuestion.questionText}
             </Text>
           </View>
-          <Text style={styles.questionText}>
-            {currentQuestion.questionText}
-          </Text>
-        </View>
 
-        {/* 音声録音コンポーネント */}
-        <VoiceRecorder
-          onRecordingComplete={handleRecordingComplete}
-          disabled={false}
-        />
-
-        <View style={styles.answerSection}>
-          <Text style={styles.answerLabel}>あなたの回答</Text>
-          <TextInput
-            style={styles.answerInput}
-            value={answer}
-            onChangeText={setAnswer}
-            placeholder="ここに回答を入力してください..."
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
+          {/* 音声録音コンポーネント */}
+          <VoiceRecorder
+            onRecordingComplete={handleRecordingComplete}
+            disabled={isProcessing}
           />
-          <Text style={styles.charCount}>{answer.length} 文字</Text>
-        </View>
 
-        <View style={styles.tip}>
-          <Text style={styles.tipIcon}>💡</Text>
-          <Text style={styles.tipText}>
-            具体的な数値や事例を含めると、より効果的な練習になります
-          </Text>
-        </View>
-      </ScrollView>
+          <View style={styles.answerSection}>
+            <Text style={styles.answerLabel}>あなたの回答</Text>
+            <TextInput
+              style={[
+                styles.answerInput,
+                isAnswerTooLong && styles.answerInputError,
+              ]}
+              value={answer}
+              onChangeText={setAnswer}
+              placeholder="ここに回答を入力してください..."
+              placeholderTextColor="#999"
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              editable={!isProcessing}
+              maxLength={MAX_ANSWER_LENGTH + 100} // 少し余裕を持たせる
+            />
+            <Text style={[styles.charCount, { color: getCharCountColor() }]}>
+              {getCharCountText()}
+            </Text>
+          </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.nextButton,
-            !answer.trim() && styles.nextButtonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!answer.trim()}
-        >
-          <Text style={styles.nextButtonText}>
-            {currentQuestionIndex === totalQuestions - 1 ? '完了' : '次へ'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.tip}>
+            <Text style={styles.tipIcon}>💡</Text>
+            <Text style={styles.tipText}>
+              具体的な数値や事例を含めると、より効果的な練習になります
+            </Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              (!answer.trim() || isAnswerTooLong || isProcessing) && styles.nextButtonDisabled,
+            ]}
+            onPress={handleNext}
+            disabled={!answer.trim() || isAnswerTooLong || isProcessing}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.nextButtonText}>
+                {currentQuestionIndex === totalQuestions - 1 ? '完了' : '次へ'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -212,6 +327,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  keyboardView: {
+    flex: 1,
   },
   header: {
     backgroundColor: '#fff',
@@ -310,11 +428,15 @@ const styles = StyleSheet.create({
     minHeight: 120,
     color: '#333',
   },
+  answerInputError: {
+    borderColor: '#FF5252',
+    borderWidth: 2,
+  },
   charCount: {
     fontSize: 12,
-    color: '#999',
     textAlign: 'right',
     marginTop: 8,
+    fontWeight: '500',
   },
   tip: {
     flexDirection: 'row',
