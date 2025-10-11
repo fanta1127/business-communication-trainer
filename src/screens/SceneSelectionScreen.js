@@ -6,41 +6,43 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SCENES } from '../constants/scenes';
+import { useSession } from '../contexts/SessionContext';
 
 export default function SceneSelectionScreen({ navigation }) {
-  // 仮の場面データ（後でconstants/scenes.jsから読み込む）
-  const scenes = [
-    {
-      id: 'weekly-report',
-      name: '週次報告会議',
-      icon: '📊',
-      description: '進捗や課題を報告する場面',
-    },
-    {
-      id: 'project-proposal',
-      name: 'プロジェクト提案',
-      icon: '💡',
-      description: '新規プロジェクトを提案する場面',
-    },
-    {
-      id: 'problem-solving',
-      name: '問題解決の議論',
-      icon: '🔧',
-      description: 'チームで課題を議論する場面',
-    },
-    {
-      id: 'customer-presentation',
-      name: '顧客へのプレゼン',
-      icon: '🎯',
-      description: '顧客に提案する場面',
-    },
-  ];
+  const { startSession } = useSession();
 
+  /**
+   * 場面選択時の処理
+   * セッションを開始し、練習画面へ遷移
+   */
   const handleSceneSelect = (scene) => {
-    // PracticeScreenに遷移（場面データを渡す）
+    // セッションを開始
+    startSession(scene);
+    
+    // 練習画面へ遷移（場面データを渡す）
     navigation.navigate('Practice', { scene });
+  };
+
+  /**
+   * 場面の詳細を表示（オプション）
+   */
+  const showSceneDetail = (scene) => {
+    Alert.alert(
+      scene.name,
+      `${scene.description}\n\n固定質問:\n${scene.fixedQuestion}`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: '練習開始', 
+          onPress: () => handleSceneSelect(scene),
+          style: 'default'
+        },
+      ]
+    );
   };
 
   return (
@@ -54,11 +56,12 @@ export default function SceneSelectionScreen({ navigation }) {
         </View>
 
         <View style={styles.scenesContainer}>
-          {scenes.map((scene) => (
+          {SCENES.map((scene) => (
             <TouchableOpacity
               key={scene.id}
               style={styles.sceneCard}
               onPress={() => handleSceneSelect(scene)}
+              onLongPress={() => showSceneDetail(scene)}
               activeOpacity={0.7}
             >
               <View style={styles.sceneIconContainer}>
@@ -75,6 +78,12 @@ export default function SceneSelectionScreen({ navigation }) {
               </View>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            💡 長押しで詳細を確認できます
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -152,5 +161,14 @@ const styles = StyleSheet.create({
   arrow: {
     fontSize: 24,
     color: '#999',
+  },
+  footer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
   },
 });
