@@ -27,6 +27,9 @@ export const SessionProvider = ({ children }) => {
    * @param {Object} scene - 選択された場面データ
    */
   const startSession = (scene) => {
+    // 総質問数 = 固定質問1問 + AI質問（デフォルト3問）
+    const totalQuestions = 1 + (scene.aiQuestionCount || 3);
+    
     const newSession = {
       sessionId: generateSessionId(),
       sceneId: scene.id,
@@ -42,7 +45,7 @@ export const SessionProvider = ({ children }) => {
           isFixedQuestion: true,
         },
       ],
-      totalQuestions: 1, // 固定質問1問のみ（AI質問生成後に増える）
+      totalQuestions, // 最初から正しい総質問数を設定
       feedback: null,
       duration: 0,
       startTime: Date.now(),
@@ -77,39 +80,86 @@ export const SessionProvider = ({ children }) => {
   /**
    * AI生成の追加質問をセッションに追加
    * @param {Array} questions - 生成された質問のリスト
+   * @returns {Promise<Object>} 更新されたセッション情報
    */
   const addAiQuestions = (questions) => {
-    if (!currentSession) return;
+    console.log('addAiQuestions開始:', {
+      hasCurrentSession: !!currentSession,
+      questionsLength: questions?.length,
+      currentQaListLength: currentSession?.qaList?.length
+    });
+    
+    return new Promise((resolve) => {
+      setCurrentSession(prevSession => {
+        if (!prevSession) {
+          console.log('addAiQuestions: currentSessionがnullのため早期リターン');
+          resolve(null);
+          return prevSession;
+        }
 
-    const newQuestions = questions.map((questionText, index) => ({
-      questionId: `q${currentSession.qaList.length + index}`,
-      questionText,
-      answerText: '',
-      answerDuration: 0,
-      isFixedQuestion: false,
-    }));
+        const newQuestions = questions.map((questionText, index) => ({
+          questionId: `q${prevSession.qaList.length + index}`,
+          questionText,
+          answerText: '',
+          answerDuration: 0,
+          isFixedQuestion: false,
+        }));
 
-    setCurrentSession({
-      ...currentSession,
-      qaList: [...currentSession.qaList, ...newQuestions],
-      totalQuestions: currentSession.qaList.length + newQuestions.length,
+        const updatedQaList = [...prevSession.qaList, ...newQuestions];
+        
+        const updatedSession = {
+          ...prevSession,
+          qaList: updatedQaList,
+          // totalQuestionsは変更しない（startSessionで設定済み）
+        };
+        
+        console.log('addAiQuestions更新前:', {
+          originalQaListLength: prevSession.qaList.length,
+          newQuestionsLength: newQuestions.length,
+          updatedQaListLength: updatedQaList.length
+        });
+        
+        // 更新されたセッション情報を返す
+        setTimeout(() => {
+          console.log('addAiQuestions: 状態更新完了、Promise解決');
+          resolve(updatedSession);
+        }, 0);
+        
+        console.log('addAiQuestions: setCurrentSession実行完了');
+        
+        return updatedSession;
+      });
     });
   };
 
   /**
    * 次の質問に進む
+   * @param {Object|null} sessionToUse - 使用するセッション情報（省略時はcurrentSessionを使用）
    * @returns {boolean} 次の質問があればtrue、なければfalse
    */
-  const moveToNextQuestion = () => {
-    if (!currentSession) return false;
+  const moveToNextQuestion = (sessionToUse = null) => {
+    const session = sessionToUse || currentSession;
+    if (!session) return false;
 
     const nextIndex = currentQuestionIndex + 1;
     
-    if (nextIndex < currentSession.qaList.length) {
+    // 渡されたセッション情報（または現在のセッション）で判定
+    if (nextIndex < session.qaList.length) {
       setCurrentQuestionIndex(nextIndex);
+      console.log('moveToNextQuestion成功:', {
+        prevIndex: currentQuestionIndex,
+        nextIndex,
+        qaListLength: session.qaList.length,
+        usedProvidedSession: !!sessionToUse
+      });
       return true;
     }
     
+    console.log('moveToNextQuestion: 次の質問なし', {
+      nextIndex,
+      qaListLength: session.qaList.length,
+      usedProvidedSession: !!sessionToUse
+    });
     return false;
   };
 

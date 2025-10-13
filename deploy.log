@@ -1,0 +1,46 @@
+
+=== Deploying to 'business-trainer-e6aaa'...
+
+i  deploying functions
+i  functions: preparing codebase default for deployment
+i  functions: ensuring required API cloudfunctions.googleapis.com is enabled...
+i  functions: ensuring required API cloudbuild.googleapis.com is enabled...
+i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled...
+⚠  functions: Runtime Node.js 18 was deprecated on 2025-04-30 and will be decommissioned on 2025-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy
+⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory.
+⚠  functions: Please note that there will be breaking changes when you upgrade.
+i  functions: Loading and analyzing source code for codebase default to determine what to deploy
+Serving at port 8522
+
+i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled...
+i  functions: Loaded environment variables from .env.
+i  functions: preparing functions directory for uploading...
+⚠ DEPRECATION NOTICE: Action required to deploy after March 2026
+  
+  functions.config() API is deprecated.
+  Cloud Runtime Configuration API, the Google Cloud service used to store function configuration data, will be shut down in March 2026. As a result, you must migrate away from using functions.config() to continue deploying your functions after March 2026.
+  
+  What this means for you:
+  
+  - The Firebase CLI commands for managing this configuration (functions:config:set, get, unset, clone, and export) are deprecated. These commands will no longer work after March 2026.
+  - firebase deploy command will fail for functions that use the legacy functions.config() API after March 2026.
+  
+  Existing deployments will continue to work with their current configuration.
+  
+  See your migration options at: https://firebase.google.com/docs/functions/config-env#migrate-to-dotenv
+i  functions: packaged /Users/t/Desktop/Coding_Practice/Expo-app/BusinessTrainer/functions (72.82 KB) for uploading
+✔  functions: functions source uploaded successfully
+i  functions: creating Node.js 18 (1st Gen) function generateQuestions(asia-northeast1)...
+i  functions: creating Node.js 18 (1st Gen) function checkOpenAIConnection(asia-northeast1)...
+✔  functions[checkOpenAIConnection(asia-northeast1)] Successful create operation.
+✔  functions[generateQuestions(asia-northeast1)] Successful create operation.
+⚠  functions: No cleanup policy detected for repositories in asia-northeast1. This may result in a small monthly bill as container images accumulate over time.
+[34m?[39m [1mHow many days do you want to keep container images before they're deleted?[22m [2m(1)[22m
+[1A[82G[1B[2K[1A[2K[G[34m?[39m [1mHow many days do you want to keep container images before they're deleted?[22m [2m(1)[22m
+[1A[82G[1B[2K[1A[2K[G[34m?[39m [1mHow many days do you want to keep container images before they're deleted?[22m 1[79G[2K[G[32m✔[39m [1mHow many days do you want to keep container images before they're deleted?[22m [36m1[39m[79G
+[?25hi  functions: Configuring cleanup policy for repository in asia-northeast1. Images older than 1 days will be automatically deleted.
+i  functions: Configured cleanup policy for repository in asia-northeast1.
+
+✔  Deploy complete!
+
+Project Console: https://console.firebase.google.com/project/business-trainer-e6aaa/overview
