@@ -1,4 +1,5 @@
 // src/constants/scenes.js
+import { QUESTION_CONFIG } from './appConfig';
 
 export const SCENES = [
   {
@@ -6,9 +7,9 @@ export const SCENES = [
     name: '週次報告会議',
     description: '上司や同僚に進捗を報告する場面',
     icon: '📊',
-    aiQuestionCount: 3,
+    aiQuestionCount: QUESTION_CONFIG.AI_COUNT,  // ✅ 定数化
     fixedQuestion: '今週の進捗状況と、現在直面している課題を具体的に説明してください',
-    aiPrompt: `あなたは週次報告会議のコーチです。ユーザーの進捗報告を聞いて、より具体的で効果的な報告になるよう、必ず正確に3個の追加質問を生成してください。
+    aiPrompt: `あなたは週次報告会議のコーチです。ユーザーの進捗報告を聞いて、より具体的で効果的な報告になるよう、必ず正確に${QUESTION_CONFIG.AI_COUNT}個の追加質問を生成してください。
 
 【質問生成の観点】
 1. 具体性の確認（数値、期限、進捗率など）
@@ -23,12 +24,12 @@ export const SCENES = [
 - 報告内容の矛盾や不足を補う質問
 - ビジネスの文脈に適した丁寧な表現
 
-必ず正確に3問の質問を生成してください。3問より多くても少なくてもいけません。
+必ず正確に${QUESTION_CONFIG.AI_COUNT}問の質問を生成してください。${QUESTION_CONFIG.AI_COUNT}問より多くても少なくてもいけません。
 
 必ず以下のJSON形式で回答してください：
 {
   "questions": ["質問1", "質問2", "質問3"],
-  "totalQuestions": 3,
+  "totalQuestions": ${QUESTION_CONFIG.AI_COUNT},
   "reasoning": "質問の意図"
 }`,
   },
@@ -37,9 +38,9 @@ export const SCENES = [
     name: 'プロジェクト提案',
     description: '新規プロジェクトを提案する場面',
     icon: '💡',
-    aiQuestionCount: 3,
+    aiQuestionCount: QUESTION_CONFIG.AI_COUNT,  // ✅ 定数化
     fixedQuestion: '提案するプロジェクトの目的と、なぜ今これが必要なのかを説明してください',
-    aiPrompt: `あなたはプロジェクト提案のコーチです。ユーザーの提案を聞いて、より説得力のある提案になるよう、必ず正確に3個の追加質問を生成してください。
+    aiPrompt: `あなたはプロジェクト提案のコーチです。ユーザーの提案を聞いて、より説得力のある提案になるよう、必ず正確に${QUESTION_CONFIG.AI_COUNT}個の追加質問を生成してください。
 
 【質問生成の観点】
 1. 提案の背景（なぜ今必要なのか）
@@ -55,12 +56,12 @@ export const SCENES = [
 - 論理的な思考を促す質問
 - 経営陣や意思決定者が気にする観点
 
-必ず正確に3問の質問を生成してください。3問より多くても少なくてもいけません。
+必ず正確に${QUESTION_CONFIG.AI_COUNT}問の質問を生成してください。${QUESTION_CONFIG.AI_COUNT}問より多くても少なくてもいけません。
 
 必ず以下のJSON形式で回答してください：
 {
   "questions": ["質問1", "質問2", "質問3"],
-  "totalQuestions": 3,
+  "totalQuestions": ${QUESTION_CONFIG.AI_COUNT},
   "reasoning": "質問の意図"
 }`,
   },
@@ -69,9 +70,9 @@ export const SCENES = [
     name: '問題解決の議論',
     description: 'チームで課題を議論する場面',
     icon: '🔧',
-    aiQuestionCount: 3,
+    aiQuestionCount: QUESTION_CONFIG.AI_COUNT,  // ✅ 定数化
     fixedQuestion: '直面している問題の具体的な状況と、それが引き起こしている影響を説明してください',
-    aiPrompt: `あなたは問題解決のファシリテーターです。ユーザーが説明した問題について、本質的な課題を明確にし解決策を導くため、必ず正確に3個の追加質問を生成してください。
+    aiPrompt: `あなたは問題解決のファシリテーターです。ユーザーが説明した問題について、本質的な課題を明確にし解決策を導くため、必ず正確に${QUESTION_CONFIG.AI_COUNT}個の追加質問を生成してください。
 
 【質問生成の観点】
 1. 問題の根本原因（Why分析）
@@ -87,12 +88,12 @@ export const SCENES = [
 - 解決策のヒントになる質問
 - チーム全体の理解を深める質問
 
-必ず正確に3問の質問を生成してください。3問より多くても少なくてもいけません。
+必ず正確に${QUESTION_CONFIG.AI_COUNT}問の質問を生成してください。${QUESTION_CONFIG.AI_COUNT}問より多くても少なくてもいけません。
 
 必ず以下のJSON形式で回答してください：
 {
   "questions": ["質問1", "質問2", "質問3"],
-  "totalQuestions": 3,
+  "totalQuestions": ${QUESTION_CONFIG.AI_COUNT},
   "reasoning": "質問の意図"
 }`,
   },
@@ -101,9 +102,9 @@ export const SCENES = [
     name: '顧客へのプレゼン',
     description: '顧客に提案する場面',
     icon: '🎯',
-    aiQuestionCount: 3,
+    aiQuestionCount: QUESTION_CONFIG.AI_COUNT,  // ✅ 定数化
     fixedQuestion: '提案する商品/サービスと、それがお客様のどんな課題を解決するかを説明してください',
-    aiPrompt: `あなたは顧客プレゼンのコーチです。ユーザーの提案内容を聞いて、より顧客に響くプレゼンになるよう、必ず正確に3個の追加質問を生成してください。
+    aiPrompt: `あなたは顧客プレゼンのコーチです。ユーザーの提案内容を聞いて、より顧客に響くプレゼンになるよう、必ず正確に${QUESTION_CONFIG.AI_COUNT}個の追加質問を生成してください。
 
 【質問生成の観点】
 1. 顧客の課題の深掘り（痛み・ニーズ）
@@ -119,12 +120,12 @@ export const SCENES = [
 - 信頼性を高める情報を確認する質問
 - 購買決定を後押しする要素の質問
 
-必ず正確に3問の質問を生成してください。3問より多くても少なくてもいけません。
+必ず正確に${QUESTION_CONFIG.AI_COUNT}問の質問を生成してください。${QUESTION_CONFIG.AI_COUNT}問より多くても少なくてもいけません。
 
 必ず以下のJSON形式で回答してください：
 {
   "questions": ["質問1", "質問2", "質問3"],
-  "totalQuestions": 3,
+  "totalQuestions": ${QUESTION_CONFIG.AI_COUNT},
   "reasoning": "質問の意図"
 }`,
   },
