@@ -1,6 +1,7 @@
 // src/contexts/SessionContext.js
 
 import React, { createContext, useState, useContext } from 'react';
+import { QUESTION_CONFIG } from '../constants/appConfig';  // ✅ 追加
 
 /**
  * セッションコンテキスト
@@ -27,8 +28,8 @@ export const SessionProvider = ({ children }) => {
    * @param {Object} scene - 選択された場面データ
    */
   const startSession = (scene) => {
-    // 総質問数 = 固定質問1問 + AI質問（デフォルト3問）
-    const totalQuestions = 1 + (scene.aiQuestionCount || 3);
+    // ✅ 総質問数を定数から計算（固定1問 + AI質問）
+    const totalQuestions = QUESTION_CONFIG.TOTAL_COUNT;
     
     const newSession = {
       sessionId: generateSessionId(),
@@ -45,7 +46,7 @@ export const SessionProvider = ({ children }) => {
           isFixedQuestion: true,
         },
       ],
-      totalQuestions, // 最初から正しい総質問数を設定
+      totalQuestions, // ✅ 常に4（固定1 + AI3）
       feedback: null,
       duration: 0,
       startTime: Date.now(),
@@ -230,7 +231,8 @@ export const SessionProvider = ({ children }) => {
       (qa) => qa.answerText.trim() !== ''
     ).length;
     
-    return Math.floor((answeredCount / currentSession.totalQuestions) * 100);
+    // ✅ 定数使用（より明確に）
+    return Math.floor((answeredCount / QUESTION_CONFIG.TOTAL_COUNT) * 100);
   };
 
   const value = {
