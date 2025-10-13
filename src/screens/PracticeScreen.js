@@ -16,11 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/SessionContext';
 import VoiceRecorder from '../components/VoiceRecorder';
 import { generateQuestions } from '../services/openaiService';
+import { ANSWER_CONFIG, getQuestionNumber } from '../constants/appConfig';  // ✅ 追加
 
-// 定数定義
-const MIN_ANSWER_LENGTH = 10;
-const MAX_ANSWER_LENGTH = 2000;
-const WARNING_ANSWER_LENGTH = 1500;
+// ❌ 削除: 定数定義（appConfigから取得）
+// const MIN_ANSWER_LENGTH = 10;
+// const MAX_ANSWER_LENGTH = 2000;
+// const WARNING_ANSWER_LENGTH = 1500;
 
 export default function PracticeScreen({ navigation, route }) {
   const { scene } = route.params || {};
@@ -46,11 +47,11 @@ export default function PracticeScreen({ navigation, route }) {
   const progress = getProgress();
   const totalQuestions = currentSession?.totalQuestions || 1;
 
-  // 文字数の状態を計算
+  // ✅ 定数使用: 文字数の状態を計算
   const answerLength = answer.length;
-  const isAnswerTooLong = answerLength > MAX_ANSWER_LENGTH;
-  const isAnswerNearLimit = answerLength >= WARNING_ANSWER_LENGTH;
-  const isAnswerTooShort = answerLength > 0 && answerLength < MIN_ANSWER_LENGTH;
+  const isAnswerTooLong = answerLength > ANSWER_CONFIG.MAX_LENGTH;
+  const isAnswerNearLimit = answerLength >= ANSWER_CONFIG.WARNING_LENGTH;
+  const isAnswerTooShort = answerLength > 0 && answerLength < ANSWER_CONFIG.MIN_LENGTH;
 
   useEffect(() => {
     // 質問が変わったらタイマーをリセット
@@ -73,17 +74,19 @@ export default function PracticeScreen({ navigation, route }) {
       };
     }
 
-    if (trimmedAnswer.length < MIN_ANSWER_LENGTH) {
+    // ✅ 定数使用
+    if (trimmedAnswer.length < ANSWER_CONFIG.MIN_LENGTH) {
       return {
         isValid: false,
-        message: `回答は${MIN_ANSWER_LENGTH}文字以上入力してください（現在: ${trimmedAnswer.length}文字）`,
+        message: `回答は${ANSWER_CONFIG.MIN_LENGTH}文字以上入力してください（現在: ${trimmedAnswer.length}文字）`,
       };
     }
 
-    if (trimmedAnswer.length > MAX_ANSWER_LENGTH) {
+    // ✅ 定数使用
+    if (trimmedAnswer.length > ANSWER_CONFIG.MAX_LENGTH) {
       return {
         isValid: false,
-        message: `回答は${MAX_ANSWER_LENGTH}文字以内にしてください（現在: ${trimmedAnswer.length}文字）`,
+        message: `回答は${ANSWER_CONFIG.MAX_LENGTH}文字以内にしてください（現在: ${trimmedAnswer.length}文字）`,
       };
     }
 
@@ -284,16 +287,17 @@ export default function PracticeScreen({ navigation, route }) {
    * 文字数の表示テキストを取得
    */
   const getCharCountText = () => {
+    // ✅ 定数使用
     if (isAnswerTooLong) {
-      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（超過）`;
+      return `${answerLength} / ${ANSWER_CONFIG.MAX_LENGTH} 文字（超過）`;
     }
     if (isAnswerNearLimit) {
-      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（残り${MAX_ANSWER_LENGTH - answerLength}）`;
+      return `${answerLength} / ${ANSWER_CONFIG.MAX_LENGTH} 文字（残り${ANSWER_CONFIG.MAX_LENGTH - answerLength}）`;
     }
     if (isAnswerTooShort && answerLength > 0) {
-      return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字（最低${MIN_ANSWER_LENGTH}文字）`;
+      return `${answerLength} / ${ANSWER_CONFIG.MAX_LENGTH} 文字（最低${ANSWER_CONFIG.MIN_LENGTH}文字）`;
     }
-    return `${answerLength} / ${MAX_ANSWER_LENGTH} 文字`;
+    return `${answerLength} / ${ANSWER_CONFIG.MAX_LENGTH} 文字`;
   };
 
   // セッションがない場合の処理
@@ -341,8 +345,9 @@ export default function PracticeScreen({ navigation, route }) {
       >
         <View style={styles.header}>
           <View style={styles.progressContainer}>
+            {/* ✅ ユーティリティ関数使用（オプション） */}
             <Text style={styles.progressText}>
-              質問 {currentQuestionIndex + 1} / {totalQuestions}
+              質問 {getQuestionNumber(currentQuestionIndex)}
             </Text>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${progress}%` }]} />
@@ -395,7 +400,7 @@ export default function PracticeScreen({ navigation, route }) {
               numberOfLines={6}
               textAlignVertical="top"
               editable={!isProcessing}
-              maxLength={MAX_ANSWER_LENGTH + 100}
+              maxLength={ANSWER_CONFIG.MAX_LENGTH + 100} 
             />
             <Text style={[styles.charCount, { color: getCharCountColor() }]}>
               {getCharCountText()}
