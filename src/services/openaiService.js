@@ -3,6 +3,11 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getSceneById } from '../constants/scenes';
 import { getDefaultQuestions } from '../constants/defaultQuestions';
+import { 
+  ANSWER_CONFIG, 
+  FIREBASE_CONFIG, 
+  TIMEOUT_CONFIG 
+} from '../constants/appConfig';  // ✅ 追加
 
 /**
  * AI質問生成（Cloud Functions経由）
@@ -18,8 +23,8 @@ export const generateQuestions = async (sceneId, userAnswer) => {
     answerLength: userAnswer.length 
   });
 
-  // 入力バリデーション
-  if (!sceneId || !userAnswer || userAnswer.trim().length < 10) {
+  // ✅ 定数使用: 入力バリデーション
+  if (!sceneId || !userAnswer || userAnswer.trim().length < ANSWER_CONFIG.MIN_LENGTH) {
     console.error('[OpenAI] 入力バリデーションエラー');
     return useFallbackQuestions(sceneId, 'VALIDATION_ERROR');
   }
@@ -32,8 +37,8 @@ export const generateQuestions = async (sceneId, userAnswer) => {
   }
 
   try {
-    // Firebase Cloud Functions を呼び出し
-    const functions = getFunctions(undefined, 'asia-northeast1');
+    // ✅ 定数使用: Firebase Cloud Functions を呼び出し
+    const functions = getFunctions(undefined, FIREBASE_CONFIG.REGION);
     const generateQuestionsFunc = httpsCallable(functions, 'generateQuestions');
 
     // Cloud Functionに送信するデータ
@@ -46,10 +51,10 @@ export const generateQuestions = async (sceneId, userAnswer) => {
 
     console.log('[OpenAI] Cloud Function呼び出し中...');
 
-    // タイムアウト付きで呼び出し
+    // ✅ 定数使用: タイムアウト付きで呼び出し
     const result = await Promise.race([
       generateQuestionsFunc(requestData),
-      timeoutPromise(35000, 'Cloud Function タイムアウト'),
+      timeoutPromise(TIMEOUT_CONFIG.CLOUD_FUNCTION_MS, 'Cloud Function タイムアウト'),
     ]);
 
     // 成功
@@ -113,7 +118,8 @@ function timeoutPromise(ms, errorMessage) {
  */
 export const checkAPIStatus = async () => {
   try {
-    const functions = getFunctions(undefined, 'asia-northeast1');
+    // ✅ 定数使用
+    const functions = getFunctions(undefined, FIREBASE_CONFIG.REGION);
     const checkConnection = httpsCallable(functions, 'checkOpenAIConnection');
     
     const result = await checkConnection();
