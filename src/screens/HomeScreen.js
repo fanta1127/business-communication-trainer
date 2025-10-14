@@ -5,20 +5,20 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity,
-  ScrollView  // ScrollViewを追加
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';  // こちらからインポート
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function HomeScreen({ navigation }) {
-  const { user, isGuest } = useAuth();
+  const { user } = useAuth();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.welcomeSection}>
           <Text style={styles.title}>
-            ようこそ、{isGuest ? 'ゲスト' : user?.displayName || 'ユーザー'}さん！
+            ようこそ、{user?.displayName || 'ユーザー'}さん！
           </Text>
           <Text style={styles.subtitle}>
             ビジネスコミュニケーションスキルを磨きましょう
@@ -34,17 +34,6 @@ export default function HomeScreen({ navigation }) {
         >
           <Text style={styles.startButtonText}>練習を始める</Text>
         </TouchableOpacity>
-
-        {isGuest && (
-          <View style={styles.guestNotice}>
-            <Text style={styles.guestNoticeText}>
-              ⚠️ ゲストモードでは練習履歴が保存されません
-            </Text>
-            <Text style={styles.guestNoticeSubtext}>
-              アカウント登録で履歴を記録できます
-            </Text>
-          </View>
-        )}
 
         <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>このアプリについて</Text>
@@ -64,7 +53,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2196F3',  // 上部の色を青に
+    backgroundColor: '#2196F3',
   },
   welcomeSection: {
     backgroundColor: '#2196F3',
@@ -99,25 +88,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  guestNotice: {
-    backgroundColor: '#FFF3CD',
-    margin: 20,
-    marginTop: 0,
-    padding: 15,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
-  },
-  guestNoticeText: {
-    fontSize: 14,
-    color: '#856404',
-    fontWeight: '600',
-    marginBottom: 5,
-  },
-  guestNoticeSubtext: {
-    fontSize: 12,
-    color: '#856404',
   },
   infoSection: {
     backgroundColor: '#fff',

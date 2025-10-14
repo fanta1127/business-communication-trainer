@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { logOut } from '../services/authService';
 
 export default function ProfileScreen() {
-  const { user, isGuest, setIsGuest } = useAuth();
+  const { user } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -21,13 +21,7 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (isGuest) {
-                // ゲストモードの場合
-                setIsGuest(false);
-              } else {
-                // 通常ログインの場合
-                await logOut();
-              }
+              await logOut();
             } catch (error) {
               Alert.alert('エラー', 'ログアウトに失敗しました');
             }
@@ -42,22 +36,13 @@ export default function ProfileScreen() {
       <View style={styles.profileSection}>
         <Text style={styles.title}>プロフィール</Text>
         
-        {isGuest ? (
-          <View style={styles.infoContainer}>
-            <Text style={styles.guestText}>ゲストモード</Text>
-            <Text style={styles.description}>
-              アカウント登録すると練習履歴を保存できます
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.infoContainer}>
-            <Text style={styles.label}>名前</Text>
-            <Text style={styles.value}>{user?.displayName || '未設定'}</Text>
-            
-            <Text style={styles.label}>メールアドレス</Text>
-            <Text style={styles.value}>{user?.email}</Text>
-          </View>
-        )}
+        <View style={styles.infoContainer}>
+          <Text style={styles.label}>名前</Text>
+          <Text style={styles.value}>{user?.displayName || '未設定'}</Text>
+          
+          <Text style={styles.label}>メールアドレス</Text>
+          <Text style={styles.value}>{user?.email}</Text>
+        </View>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -95,16 +80,6 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 16,
     color: '#333',
-  },
-  guestText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2196F3',
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
   },
   logoutButton: {
     backgroundColor: '#f44336',

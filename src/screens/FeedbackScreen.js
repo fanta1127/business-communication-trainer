@@ -5,15 +5,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  // SafeAreaView を削除
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';  // 追加
-import { useAuth } from '../contexts/AuthContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function FeedbackScreen({ navigation, route }) {
   const { scene, answers } = route.params || {};
-  const { user, isGuest, logout } = useAuth();
 
   // 仮のフィードバックデータ（後でAIが生成）
   const feedback = {
@@ -48,15 +45,9 @@ export default function FeedbackScreen({ navigation, route }) {
   };
 
   const handleSaveSession = () => {
-    if (isGuest) {
-      // ゲストモードの場合は、ログアウトして認証画面に戻る
-      // AppNavigatorが自動的にAuthNavigatorに切り替わり、Signup画面に誘導できる
-      logout();
-    } else {
-      // セッションを保存（後で実装）
-      console.log('セッションを保存します');
-      navigation.navigate('History');
-    }
+    // セッションを保存（後で実装）
+    console.log('セッションを保存します');
+    navigation.navigate('History');
   };
 
   const handleRetry = () => {
@@ -134,26 +125,12 @@ export default function FeedbackScreen({ navigation, route }) {
 
         {/* アクションボタン */}
         <View style={styles.actions}>
-          {isGuest ? (
-            <View style={styles.guestNotice}>
-              <Text style={styles.guestNoticeText}>
-                ログインして履歴を保存しましょう
-              </Text>
-              <TouchableOpacity 
-                style={styles.primaryButton}
-                onPress={handleSaveSession}
-              >
-                <Text style={styles.primaryButtonText}>アカウントを作成</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={handleSaveSession}
-            >
-              <Text style={styles.primaryButtonText}>履歴に保存</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={handleSaveSession}
+          >
+            <Text style={styles.primaryButtonText}>履歴に保存</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.secondaryButton}
@@ -328,18 +305,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     padding: 16,
-  },
-  guestNotice: {
-    backgroundColor: '#fff3e0',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  guestNoticeText: {
-    fontSize: 14,
-    color: '#f57c00',
-    textAlign: 'center',
-    marginBottom: 12,
   },
   primaryButton: {
     backgroundColor: '#2196F3',

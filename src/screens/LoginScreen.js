@@ -13,10 +13,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { signIn } from '../services/authService';
-import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginScreen({ navigation }) {
-  const { setIsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,26 +54,6 @@ export default function LoginScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  // ゲストモードで続ける
-  const handleGuestMode = () => {
-    Alert.alert(
-      'ゲストモード',
-      '練習データは保存されませんが、すべての機能をお試しいただけます。',
-      [
-        {
-          text: 'キャンセル',
-          style: 'cancel',
-        },
-        {
-          text: 'ゲストで続ける',
-          onPress: () => {
-            setIsGuest(true);
-          },
-        },
-      ]
-    );
   };
 
   return (
@@ -143,22 +121,6 @@ export default function LoginScreen({ navigation }) {
               アカウントをお持ちでない方は
               <Text style={styles.signupLinkTextBold}> 新規登録</Text>
             </Text>
-          </TouchableOpacity>
-
-          {/* 区切り線 */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>または</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* ゲストモードボタン */}
-          <TouchableOpacity
-            style={styles.guestButton}
-            onPress={handleGuestMode}
-            disabled={loading}
-          >
-            <Text style={styles.guestButtonText}>ゲストで続ける</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -234,34 +196,6 @@ const styles = StyleSheet.create({
   },
   signupLinkTextBold: {
     color: '#2196F3',
-    fontWeight: 'bold',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 30,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    color: '#999',
-    fontSize: 14,
-  },
-  guestButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#2196F3',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  guestButtonText: {
-    color: '#2196F3',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });

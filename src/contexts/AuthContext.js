@@ -6,8 +6,6 @@ import { subscribeToAuthChanges } from '../services/authService';
 export const AuthContext = createContext({
   user: null,
   loading: true,
-  isGuest: false,
-  setIsGuest: () => {},
   logout: () => {},
 });
 
@@ -24,7 +22,6 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     // Firebase Authentication の状態変更を監視
@@ -32,18 +29,13 @@ export const AuthProvider = ({ children }) => {
       console.log('Auth state changed:', firebaseUser ? 'Logged in' : 'Logged out');
       setUser(firebaseUser);
       setLoading(false);
-      
-      // ユーザーがログインしたらゲストモードを解除
-      if (firebaseUser) {
-        setIsGuest(false);
-      }
     });
 
     // クリーンアップ関数
     return () => unsubscribe();
   }, []);
 
-  // ログアウト関数：認証状態とゲストモードをリセット
+  // ログアウト関数：認証状態をリセット
   const logout = async () => {
     try {
       // Firebaseからログアウト（ユーザーがログインしている場合）
@@ -51,13 +43,10 @@ export const AuthProvider = ({ children }) => {
         const { logOut } = require('../services/authService');
         await logOut();
       }
-      // ゲストモードもリセット
-      setIsGuest(false);
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
-      // エラーが発生してもゲストモードはリセット
-      setIsGuest(false);
+      // エラーが発生してもstateはリセット
       setUser(null);
     }
   };
@@ -65,8 +54,6 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
-    isGuest,
-    setIsGuest,
     logout,
   };
 

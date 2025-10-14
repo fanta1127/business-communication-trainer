@@ -165,7 +165,7 @@ function MainTabNavigator() {
 
 // メインナビゲーター
 export default function AppNavigator() {
-  const { user, loading, isGuest } = useAuth();
+  const { user, loading } = useAuth();
 
   // 認証状態をチェック中
   if (loading) {
@@ -176,7 +176,6 @@ export default function AppNavigator() {
     );
   }
 
-  // ユーザーがログインしているか、ゲストモードの場合はメイン画面
-  // それ以外は認証画面
-  return user || isGuest ? <MainTabNavigator /> : <AuthNavigator />;
+  // ユーザーがログインしている場合はメイン画面、それ以外は認証画面
+  return user ? <MainTabNavigator /> : <AuthNavigator />;
 }
