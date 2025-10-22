@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function FeedbackScreen({ navigation, route }) {
   const { scene, answers } = route.params || {};
 
-  // 仮のフィードバックデータ（後でAIが生成）
   const feedback = {
     summary: '全体的に具体的な説明ができており、良い報告でした。さらに改善できる点もいくつかあります。',
     goodPoints: [
@@ -45,8 +44,6 @@ export default function FeedbackScreen({ navigation, route }) {
   };
 
   const handleSaveSession = () => {
-    // セッションを保存（後で実装）
-    console.log('セッションを保存します');
     navigation.navigate('History');
   };
 
@@ -68,13 +65,11 @@ export default function FeedbackScreen({ navigation, route }) {
         </View>
 
         <View style={styles.content}>
-          {/* サマリー */}
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>総評</Text>
             <Text style={styles.summaryText}>{feedback.summary}</Text>
           </View>
 
-          {/* 良かった点 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>✅ 良かった点</Text>
             {feedback.goodPoints.map((point, index) => (
@@ -88,7 +83,6 @@ export default function FeedbackScreen({ navigation, route }) {
             ))}
           </View>
 
-          {/* 改善点 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>💡 改善のヒント</Text>
             {feedback.improvementPoints.map((point, index) => (
@@ -116,14 +110,12 @@ export default function FeedbackScreen({ navigation, route }) {
             ))}
           </View>
 
-          {/* 励まし */}
           <View style={styles.encouragementCard}>
             <Text style={styles.encouragementIcon}>🌟</Text>
             <Text style={styles.encouragementText}>{feedback.encouragement}</Text>
           </View>
         </View>
 
-        {/* アクションボタン */}
         <View style={styles.actions}>
           <TouchableOpacity 
             style={styles.primaryButton}

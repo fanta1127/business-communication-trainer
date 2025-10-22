@@ -18,91 +18,60 @@ import {
   getSpeechErrorMessage,
 } from '../services/speechService';
 
-/**
- * VoiceRecorderコンポーネント
- * 音声録音 + リアルタイム文字起こし機能を提供
- * 
- * Props:
- * - onRecordingComplete: (transcribedText, duration) => void - 録音完了時のコールバック
- * - disabled: boolean - ボタンの無効化
- */
 export default function VoiceRecorder({ onRecordingComplete, disabled = false }) {
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [permissionResponse, requestPermission] = Audio.usePermissions();
-  
-  // 文字起こし関連のステート
   const [transcribedText, setTranscribedText] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [speechAvailable, setSpeechAvailable] = useState(true);
 
-  // アニメーション用の値
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseAnimLoopRef = useRef(null);
   const durationInterval = useRef(null);
-  
-  // 多重起動ガード
   const isStartingRef = useRef(false);
-  
-  // 🔧 改善1: アンマウント時のクリーンアップ用Ref
   const isMountedRef = useRef(true);
   const recordingRef = useRef(null);
   const isTranscribingRef = useRef(false);
-  
-  // 🔧 改善3: 二重コールバック防止
   const didCompleteRef = useRef(false);
 
-  // 🔧 改善1: マウント状態を追跡
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  // 🔧 改善1: 録音状態をRefに同期
   useEffect(() => {
     recordingRef.current = recording;
   }, [recording]);
 
-  // 🔧 改善1: 文字起こし状態をRefに同期
   useEffect(() => {
     isTranscribingRef.current = isTranscribing;
   }, [isTranscribing]);
 
-  // 🔧 改善1: アンマウント時の総クリーンアップ
   useEffect(() => {
     return () => {
       (async () => {
-        try {
-          // 音声認識をキャンセル
-          if (isTranscribingRef.current) {
-            await cancelRealtimeRecognition();
-          }
-        } catch (err) {
-          console.warn('[VoiceRecorder] クリーンアップ: 音声認識停止エラー', err);
-        }
+        await stopSpeechRecognitionSafely(true);
 
         try {
-          // 録音を停止
           if (recordingRef.current) {
             await recordingRef.current.stopAndUnloadAsync();
           }
         } catch (err) {
-          console.warn('[VoiceRecorder] クリーンアップ: 録音停止エラー', err);
+          // クリーンアップ時のエラーは無視
         }
 
         try {
-          // オーディオモードをリセット
           await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
         } catch (err) {
-          console.warn('[VoiceRecorder] クリーンアップ: オーディオモードリセットエラー', err);
+          // クリーンアップ時のエラーは無視
         }
       })();
     };
   }, []);
 
-  // 音声認識の利用可能性チェック
   useEffect(() => {
     checkSpeechAvailability();
   }, []);
@@ -110,12 +79,33 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
   const checkSpeechAvailability = async () => {
     const available = await isSpeechRecognitionAvailable();
     setSpeechAvailable(available);
-    if (!available) {
-      console.warn('[VoiceRecorder] 音声認識が利用できません');
-    }
   };
 
-  // 録音中のパルスアニメーション
+  // 音声認識を安全に停止するヘルパー関数
+  const stopSpeechRecognitionSafely = async (useCancel = false) => {
+    if (!isTranscribing && !isTranscribingRef.current) return;
+
+    try {
+      if (useCancel) {
+        await cancelRealtimeRecognition();
+      } else {
+        await stopRealtimeRecognition();
+      }
+    } catch (error) {
+      // エラーは無視して続行
+    }
+
+    setIsTranscribing(false);
+  };
+
+  // 録音関連のステートを初期化するヘルパー関数
+  const resetRecordingState = () => {
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setIsTranscribing(false);
+    setTranscribedText('');
+  };
+
   useEffect(() => {
     if (isRecording) {
       const loop = Animated.loop(
@@ -135,7 +125,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
       pulseAnimLoopRef.current = loop;
       loop.start();
 
-      // 録音時間のカウント
       durationInterval.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
@@ -159,19 +148,13 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
     };
   }, [isRecording]);
 
-  /**
-   * 録音と音声認識を開始
-   */
   const startRecording = async () => {
-    // 多重起動防止
     if (isStartingRef.current || isRecording) {
-      console.warn('[VoiceRecorder] 録音開始の多重実行を防止');
       return;
     }
     isStartingRef.current = true;
 
     try {
-      // 権限チェック
       if (!permissionResponse || permissionResponse.status !== 'granted') {
         const permission = await requestPermission();
         if (!permission.granted) {
@@ -183,34 +166,27 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
         }
       }
 
-      // オーディオモードの設定
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
       });
 
-      // 🔧 改善4: 開始直前に音声認識の可用性を再チェック
       const canUseSpeech = await isSpeechRecognitionAvailable().catch(() => false);
       setSpeechAvailable(canUseSpeech);
 
-      // 音声認識を開始（リアルタイム）
       if (canUseSpeech) {
-        setTranscribedText(''); // リセット
+        setTranscribedText('');
         setIsTranscribing(true);
         
         try {
           await startRealtimeRecognition(
-            // 🔧 改善2: 認識結果のコールバック（アンマウント後のsetState回避）
             (text) => {
-              console.log('[VoiceRecorder] 認識テキスト:', text);
               if (isMountedRef.current) {
                 setTranscribedText(text);
               }
             },
-            // 🔧 改善2: エラーコールバック（アンマウント後のsetState回避）
             (error) => {
-              console.error('[VoiceRecorder] 音声認識エラー:', error);
               if (isMountedRef.current) {
                 setIsTranscribing(false);
               }
@@ -219,16 +195,13 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
         } catch (speechError) {
           console.warn('[VoiceRecorder] 音声認識開始失敗:', speechError);
           setIsTranscribing(false);
-          // 🔧 改善5: STTエラーをユーザー向けに整形
           Alert.alert(
             '音声認識エラー',
             getSpeechErrorMessage?.(speechError) ?? '音声認識を開始できませんでした。録音は続行します。'
           );
-          // 録音は続行
         }
       }
 
-      // 録音開始
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -236,8 +209,7 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
       setRecording(recording);
       setIsRecording(true);
       setRecordingDuration(0);
-      console.log('[VoiceRecorder] 録音と音声認識を開始しました');
-      
+
     } catch (err) {
       console.error('[VoiceRecorder] 録音開始エラー:', err);
       Alert.alert('エラー', '録音を開始できませんでした。もう一度お試しください。');
@@ -247,55 +219,34 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
     }
   };
 
-  /**
-   * 録音と音声認識を停止
-   * 🔧 改善3: 二重コールバック防止
-   */
   const stopRecording = async () => {
     if (!recording) return;
-    
-    // 🔧 改善3: 二重コールバック防止
+
     if (didCompleteRef.current) {
-      console.warn('[VoiceRecorder] 録音完了の二重実行を防止');
       return;
     }
 
     try {
       setIsRecording(false);
-      
-      // 音声認識を停止
-      if (isTranscribing) {
-        try {
-          await stopRealtimeRecognition();
-        } catch (speechError) {
-          console.warn('[VoiceRecorder] 音声認識停止エラー:', speechError);
-        }
-        setIsTranscribing(false);
-      }
-      
-      // 録音を停止
+
+      await stopSpeechRecognitionSafely(false);
+
       await recording.stopAndUnloadAsync();
       
-      // オーディオモードをリセット
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
       });
 
-      const uri = recording.getURI();
       const duration = recordingDuration;
-      
+
       setRecording(null);
       setRecordingDuration(0);
 
-      console.log('[VoiceRecorder] 録音完了:', { uri, duration, transcribedText });
-
-      // 🔧 改善3: 録音完了コールバック（一度だけ実行）
       if (onRecordingComplete) {
         didCompleteRef.current = true;
         onRecordingComplete(transcribedText, duration);
       }
 
-      // 文字起こし結果に応じたメッセージ
       if (transcribedText && transcribedText.trim().length > 0) {
         Alert.alert(
           '録音完了',
@@ -309,48 +260,31 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
           [{ text: 'OK' }]
         );
       }
-      
-      // リセット
+
       setTranscribedText('');
-      
+
     } catch (err) {
       console.error('[VoiceRecorder] 録音停止エラー:', err);
       Alert.alert('エラー', '録音の保存に失敗しました。');
-      setIsRecording(false);
-      setRecordingDuration(0);
-      setIsTranscribing(false);
-      setTranscribedText('');
+      resetRecordingState();
     } finally {
-      // 🔧 改善3: 少し遅らせて再度停止可能に戻す（連打対策）
       setTimeout(() => {
         didCompleteRef.current = false;
       }, 300);
-      // 失敗してもUIを正常化
       if (isMountedRef.current) {
         setIsTranscribing(false);
       }
     }
   };
 
-  /**
-   * 録音と音声認識をキャンセル
-   */
   const cancelRecording = async () => {
     if (!recording) return;
 
     try {
       setIsRecording(false);
-      
-      // 音声認識をキャンセル
-      if (isTranscribing) {
-        try {
-          await cancelRealtimeRecognition();
-        } catch (speechError) {
-          console.warn('[VoiceRecorder] 音声認識キャンセルエラー:', speechError);
-        }
-        setIsTranscribing(false);
-      }
-      
+
+      await stopSpeechRecognitionSafely(true);
+
       await recording.stopAndUnloadAsync();
       
       await Audio.setAudioModeAsync({
@@ -360,20 +294,13 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
       setRecording(null);
       setRecordingDuration(0);
       setTranscribedText('');
-      console.log('[VoiceRecorder] 録音をキャンセルしました');
-      
+
     } catch (err) {
       console.error('[VoiceRecorder] 録音キャンセルエラー:', err);
-      setIsRecording(false);
-      setRecordingDuration(0);
-      setIsTranscribing(false);
-      setTranscribedText('');
+      resetRecordingState();
     }
   };
 
-  /**
-   * 時間を MM:SS 形式でフォーマット
-   */
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -383,7 +310,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
   return (
     <View style={styles.container}>
       {!isRecording ? (
-        // 録音開始ボタン
         <TouchableOpacity
           style={[styles.recordButton, disabled && styles.recordButtonDisabled]}
           onPress={startRecording}
@@ -398,7 +324,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
           </Text>
         </TouchableOpacity>
       ) : (
-        // 録音中UI
         <View style={styles.recordingContainer}>
           <Animated.View
             style={[
@@ -415,7 +340,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
               {formatDuration(recordingDuration)}
             </Text>
             
-            {/* 文字起こし状態表示 */}
             {isTranscribing && (
               <View style={styles.transcribingStatus}>
                 <ActivityIndicator size="small" color="#2196F3" />
@@ -423,7 +347,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
               </View>
             )}
             
-            {/* 認識中のテキストをリアルタイム表示 */}
             {transcribedText && transcribedText.trim().length > 0 && (
               <View style={styles.liveTextContainer}>
                 <Text style={styles.liveTextLabel}>認識中:</Text>
@@ -452,7 +375,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
         </View>
       )}
 
-      {/* 音声認識の案内 */}
       <View style={styles.notice}>
         <Text style={styles.noticeIcon}>
           {speechAvailable ? '✅' : 'ℹ️'}
