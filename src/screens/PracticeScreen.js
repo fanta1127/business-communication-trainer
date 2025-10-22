@@ -93,16 +93,30 @@ export default function PracticeScreen({ navigation, route }) {
     return { isValid: true, message: '' };
   };
 
-  /**
+/**
    * 音声録音完了時の処理
+   * 🆕 文字起こしテキストを受け取って自動入力
    */
-  const handleRecordingComplete = (uri, duration) => {
-    setAudioUri(uri);
-    console.log('録音完了:', { uri, duration });
-
-    // テキスト入力にフォーカスを促す
-    // 将来的にここで音声認識APIを呼び出す
-  };
+const handleRecordingComplete = (transcribedText, duration) => {
+  console.log('[Practice] 録音完了:', { 
+    transcribedText, 
+    duration,
+    textLength: transcribedText?.length || 0 
+  });
+  
+  // 🆕 文字起こしテキストを回答欄に自動入力
+  if (transcribedText && transcribedText.trim().length > 0) {
+    setAnswer(transcribedText.trim());
+    console.log('[Practice] 文字起こしテキストを回答欄に設定しました');
+  } else {
+    console.log('[Practice] 文字起こしテキストが空です - ユーザーが手動入力する必要があります');
+  }
+  
+  // 録音時間を保存（オプション - 将来の統計用）
+  if (duration > 0) {
+    setAudioUri(duration.toString()); // durationを一時保存
+  }
+};
 
   /**
    * 次へボタンの処理

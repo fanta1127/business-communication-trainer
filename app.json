@@ -14,7 +14,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "このアプリは音声入力機能でマイクを使用します。"
+        "NSMicrophoneUsageDescription": "このアプリは音声入力機能でマイクを使用します。",
+        "NSSpeechRecognitionUsageDescription": "音声入力を文字起こしするために音声認識機能を使用します。"
       }
     },
     "android": {
