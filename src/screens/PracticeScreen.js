@@ -331,7 +331,7 @@ export default function PracticeScreen({ navigation, route }) {
               numberOfLines={6}
               textAlignVertical="top"
               editable={!isProcessing}
-              maxLength={ANSWER_CONFIG.MAX_LENGTH + 100} 
+              maxLength={ANSWER_CONFIG.MAX_LENGTH} 
             />
             <Text style={[styles.charCount, { color: getCharCountColor() }]}>
               {getCharCountText()}

@@ -52,45 +52,48 @@ export const SessionProvider = ({ children }) => {
     });
   };
 
+  /**
+   * AI生成質問をセッションに追加し、次の質問に自動的に移動
+   * @param {string[]} questions - AI生成された質問の配列
+   */
   const addAiQuestions = (questions) => {
-    return new Promise((resolve) => {
-      setCurrentSession(prevSession => {
-        if (!prevSession) {
-          resolve(null);
-          return prevSession;
-        }
+    setCurrentSession(prevSession => {
+      if (!prevSession) {
+        console.warn('[SessionContext] addAiQuestions: セッションが存在しません');
+        return prevSession;
+      }
 
-        const newQuestions = questions.map((questionText, index) => ({
-          questionId: `q${prevSession.qaList.length + index}`,
-          questionText,
-          answerText: '',
-          answerDuration: 0,
-          isFixedQuestion: false,
-        }));
+      const newQuestions = questions.map((questionText, index) => ({
+        questionId: `q${prevSession.qaList.length + index}`,
+        questionText,
+        answerText: '',
+        answerDuration: 0,
+        isFixedQuestion: false,
+      }));
 
-        const updatedQaList = [...prevSession.qaList, ...newQuestions];
-
-        const updatedSession = {
-          ...prevSession,
-          qaList: updatedQaList,
-        };
-
-        setTimeout(() => {
-          resolve(updatedSession);
-        }, 0);
-
-        return updatedSession;
-      });
+      return {
+        ...prevSession,
+        qaList: [...prevSession.qaList, ...newQuestions],
+      };
     });
+
+    // 質問が追加されたので、次の質問（最初のAI質問）に移動
+    setCurrentQuestionIndex(prev => prev + 1);
   };
 
-  const moveToNextQuestion = (sessionToUse = null) => {
-    const session = sessionToUse || currentSession;
-    if (!session) return false;
+  /**
+   * 次の質問に移動
+   * @returns {boolean} 移動できた場合true、最後の質問の場合false
+   */
+  const moveToNextQuestion = () => {
+    if (!currentSession) {
+      console.warn('[SessionContext] moveToNextQuestion: セッションが存在しません');
+      return false;
+    }
 
     const nextIndex = currentQuestionIndex + 1;
 
-    if (nextIndex < session.qaList.length) {
+    if (nextIndex < currentSession.qaList.length) {
       setCurrentQuestionIndex(nextIndex);
       return true;
     }
