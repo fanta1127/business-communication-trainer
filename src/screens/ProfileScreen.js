@@ -35,11 +35,11 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <View style={styles.profileSection}>
         <Text style={styles.title}>プロフィール</Text>
-        
+
         <View style={styles.infoContainer}>
           <Text style={styles.label}>名前</Text>
           <Text style={styles.value}>{user?.displayName || '未設定'}</Text>
-          
+
           <Text style={styles.label}>メールアドレス</Text>
           <Text style={styles.value}>{user?.email}</Text>
         </View>

@@ -42,3 +42,7 @@ yarn-error.*
 
 # Additional environment files
 .env
+
+# Claude Code / Development
+.serena/
+.claude/
