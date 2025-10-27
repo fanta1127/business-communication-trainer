@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/SessionContext';
 import VoiceRecorder from '../components/VoiceRecorder';
-import { generateQuestions } from '../services/openaiService';
+import { generateQuestions, generateFeedback } from '../services/openaiService';
 import { ANSWER_CONFIG, getQuestionNumber } from '../constants/appConfig';
 
 export default function PracticeScreen({ navigation, route }) {
@@ -27,6 +27,7 @@ export default function PracticeScreen({ navigation, route }) {
     saveAnswer,
     moveToNextQuestion,
     addAiQuestions,
+    saveFeedback,
     getProgress,
     resetSession,
   } = useSession();
@@ -103,6 +104,14 @@ export default function PracticeScreen({ navigation, route }) {
       const currentQuestion = getCurrentQuestion();
       const isFixedQuestion = currentQuestion?.isFixedQuestion;
 
+      // 現在の回答を保存（更新されたqaListを作成）
+      const updatedQaList = [...currentSession.qaList];
+      updatedQaList[currentQuestionIndex] = {
+        ...updatedQaList[currentQuestionIndex],
+        answerText: answer.trim(),
+        answerDuration: duration,
+      };
+
       saveAnswer(answer.trim(), duration);
 
       if (isFixedQuestion) {
@@ -159,26 +168,48 @@ export default function PracticeScreen({ navigation, route }) {
         const hasNext = moveToNextQuestion();
 
         if (!hasNext) {
-          Alert.alert(
-            '練習完了',
-            'お疲れ様でした！全ての質問への回答が完了しました。\n\nフィードバック機能は Week 2（Day 10-11）で実装予定です。',
-            [
-              {
-                text: 'ホームに戻る',
-                onPress: () => {
-                  resetSession();
-                  navigation.navigate('Home');
+          // 全質問完了 - フィードバック生成処理へ
+          console.log('[PracticeScreen] 全質問完了 - フィードバック生成開始');
+          console.log('[PracticeScreen] qaList:', JSON.stringify(updatedQaList, null, 2));
+
+          try {
+            // フィードバック生成API呼び出し（更新されたqaListを使用）
+            const feedbackResult = await generateFeedback(
+              currentSession.sceneId,
+              currentSession.sceneName,
+              updatedQaList
+            );
+
+            // フィードバックをセッションに保存
+            saveFeedback(feedbackResult);
+
+            // FeedbackScreen画面に遷移
+            navigation.navigate('Feedback');
+
+          } catch (error) {
+            console.error('[PracticeScreen] フィードバック生成エラー:', error);
+
+            Alert.alert(
+              'エラー',
+              'フィードバックの生成に失敗しました。\n\nもう一度お試しいただくか、後で再度確認してください。',
+              [
+                {
+                  text: 'ホームに戻る',
+                  onPress: () => {
+                    resetSession();
+                    navigation.navigate('Home');
+                  },
                 },
-              },
-              {
-                text: 'もう一度練習',
-                onPress: () => {
-                  resetSession();
-                  navigation.goBack();
+                {
+                  text: 'もう一度',
+                  onPress: () => {
+                    resetSession();
+                    navigation.goBack();
+                  },
                 },
-              },
-            ]
-          );
+              ]
+            );
+          }
         } else {
           setAnswer('');
         }

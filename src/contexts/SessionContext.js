@@ -1,12 +1,17 @@
 import React, { createContext, useState, useContext } from 'react';
 import { QUESTION_CONFIG } from '../constants/appConfig';
+import { saveSession } from '../services/firestoreService';
+import { useAuth } from './AuthContext';
 
 const SessionContext = createContext();
 
 export const SessionProvider = ({ children }) => {
+  const { user } = useAuth();
   const [currentSession, setCurrentSession] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const startSession = (scene) => {
     const totalQuestions = QUESTION_CONFIG.TOTAL_COUNT;
@@ -141,12 +146,69 @@ export const SessionProvider = ({ children }) => {
 
   const getProgress = () => {
     if (!currentSession) return 0;
-    
+
     const answeredCount = currentSession.qaList.filter(
       (qa) => qa.answerText.trim() !== ''
     ).length;
-    
+
     return Math.floor((answeredCount / QUESTION_CONFIG.TOTAL_COUNT) * 100);
+  };
+
+  /**
+   * セッションをFirestoreに保存
+   * @returns {Promise<string>} 保存されたセッションID
+   */
+  const saveSessionToFirestore = async () => {
+    try {
+      setSaving(true);
+      setSaveError(null);
+
+      console.log('[SessionContext] Saving session to Firestore...');
+
+      // ユーザーチェック
+      if (!user || !user.uid) {
+        throw new Error('ログインが必要です');
+      }
+
+      // セッションデータチェック
+      if (!currentSession) {
+        throw new Error('保存するセッションがありません');
+      }
+
+      // セッションデータを準備
+      const sessionData = {
+        sceneId: currentSession.sceneId,
+        sceneName: currentSession.sceneName,
+        qaList: currentSession.qaList,
+        feedback: currentSession.feedback,
+        duration: currentSession.duration || 0,
+      };
+
+      // Firestoreに保存
+      const sessionId = await saveSession(user.uid, sessionData);
+
+      console.log('[SessionContext] Session saved successfully:', sessionId);
+
+      return sessionId;
+
+    } catch (error) {
+      console.error('[SessionContext] Save error:', error);
+
+      // エラーメッセージの分類
+      let userMessage = error.message;
+
+      if (error.message.includes('network') || error.message.includes('Network')) {
+        userMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+      } else if (error.message.includes('permission')) {
+        userMessage = 'データへのアクセス権限がありません。ログインしてください。';
+      }
+
+      setSaveError(userMessage);
+      throw new Error(userMessage);
+
+    } finally {
+      setSaving(false);
+    }
   };
 
   const value = {
@@ -163,6 +225,9 @@ export const SessionProvider = ({ children }) => {
     getCurrentQuestion,
     isSessionComplete,
     getProgress,
+    saveSessionToFirestore,
+    saving,
+    saveError,
   };
 
   return (
