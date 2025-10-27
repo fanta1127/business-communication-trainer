@@ -681,9 +681,14 @@ npx expo start
 ### **ブランチ戦略**
 
 ```
-main (本番)
-  └── day10-development-build (開発中) ← 現在ここ
+main (本番) ← Week 2完了状態
+  └── week3-development (開発中) ← 現在ここ
 ```
+
+**ブランチ命名規則**:
+- `main`: 本番ブランチ（リリース可能な状態）
+- `week<N>-development`: Week単位の開発ブランチ
+- `feature/<feature-name>`: 機能別ブランチ（必要に応じて）
 
 **コミットメッセージ規約**:
 ```
@@ -694,6 +699,138 @@ main (本番)
 [setup] 環境構築
 [test] テスト追加
 ```
+
+---
+
+### **Gitワークフロー（プルリクエスト & マージ）**
+
+Week単位で開発を完了したら、mainブランチに統合します。
+
+#### **手順1: 現在の状態確認**
+
+```bash
+# 作業ディレクトリがクリーンか確認
+git status
+
+# すべての変更がコミット・プッシュ済みか確認
+git log origin/<branch-name>..HEAD --oneline
+```
+
+---
+
+#### **手順2: GitHubでプルリクエスト作成**
+
+1. **GitHubリポジトリを開く**
+   ```
+   https://github.com/fanta1127/business-communication-trainer
+   ```
+
+2. **プルリクエスト作成**
+   - 黄色いバナーの **[Compare & pull request]** をクリック
+   - または **Pull requests** タブ → **[New pull request]**
+
+3. **プルリクエスト内容を記入**
+   - **Title**: `[Week N完了] 機能概要 (Day X-Y)`
+   - **Description**:
+     - 実装完了機能のリスト
+     - 主要な技術実装
+     - テスト状況
+     - 次のステップ
+
+4. **[Create pull request]** をクリック
+
+---
+
+#### **手順3: マージの実行**
+
+1. **変更内容の確認（オプション）**
+   - **Files changed** タブで差分を確認
+
+2. **マージ方法の選択**
+   - **Create a merge commit** ← 推奨（履歴を保持）
+   - Squash and merge（コミットを1つにまとめる）
+   - Rebase and merge（履歴を一直線にする）
+
+3. **マージの実行**
+   - **[Merge pull request]** をクリック
+   - **[Confirm merge]** をクリック
+
+---
+
+#### **手順4: ローカルのmainブランチを更新**
+
+```bash
+# mainブランチに切り替え
+git checkout main
+
+# リモートから最新状態を取得
+git pull origin main
+
+# マージ結果の確認
+git log --oneline -5
+```
+
+---
+
+#### **手順5: 新しい開発ブランチの作成**
+
+```bash
+# mainから新しいブランチを作成
+git checkout -b week<N>-development
+
+# リモートにプッシュ
+git push -u origin week<N>-development
+
+# ブランチ状態の確認
+git branch -a
+```
+
+---
+
+#### **手順6: 古いブランチの削除（オプション）**
+
+```bash
+# ローカルブランチを削除
+git branch -d <old-branch-name>
+
+# リモートブランチを削除
+git push origin --delete <old-branch-name>
+
+# 削除確認
+git branch -a
+```
+
+---
+
+#### **実施例: Week 2完了時（Day 14完了）**
+
+```bash
+# 1. プルリクエスト作成（GitHub上で実施）
+# - Title: [Week 2完了] AI統合 + データ管理機能実装 (Day 9-14)
+# - 13個のコミットを含む
+
+# 2. マージ実行（GitHub上で実施）
+# - Create a merge commit を選択
+# - マージコミット: 41f1e13
+
+# 3. ローカル更新
+git checkout main
+git pull origin main
+# → 32ファイル変更、8,505行追加、3,641行削除
+
+# 4. Week 3用ブランチ作成
+git checkout -b week3-development
+git push -u origin week3-development
+
+# 5. 古いブランチ削除
+git branch -d day10-development-build
+git push origin --delete day10-development-build
+```
+
+**結果**:
+- ✅ Week 2の成果がmainブランチに統合
+- ✅ week3-developmentブランチで新しい開発を開始
+- ✅ リポジトリがクリーンな状態に
 
 ---
 
