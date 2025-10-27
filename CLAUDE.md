@@ -1,9 +1,9 @@
 # Business Communication Trainer - 開発ガイド (CLAUDE.md)
 
-**最終更新**: 2025年10月27日 (Day 14完了時点)
+**最終更新**: 2025年10月27日 (Day 15完了時点)
 **プロジェクト名**: Business Communication Trainer
 **リポジトリ**: https://github.com/fanta1127/business-communication-trainer/
-**ブランチ**: `day10-development-build`
+**ブランチ**: `week3-development`
 
 ---
 
@@ -18,7 +18,8 @@
 - ✅ **Day 12**: Firestoreデータモデル実装
 - ✅ **Day 13**: データ保存機能実装
 - ✅ **Day 14**: 履歴機能実装（Week 2完了！）
-- ⏳ **Day 15**: 統計・分析機能（次回予定）
+- ✅ **Day 15**: 統計・分析機能実装（Week 3開始！）
+- ⏳ **Day 16**: グラフ表示機能（次回予定）
 
 ### **最新コミット**
 ```bash
@@ -27,7 +28,7 @@ e0ba2d2 - [docs] CLAUDE.md作成 - プロジェクト開発ガイド
 c12c1c2 - [feat] Day 13: データ保存機能実装
 ```
 
-### **全体進捗**: 14/21日 (66.7%) - Week 2完了！
+### **全体進捗**: 15/21日 (71.4%) - Week 3開始！
 
 ---
 
@@ -49,15 +50,17 @@ BusinessTrainer/
 │   │   ├── FeedbackScreen.js     # フィードバック表示 + 保存
 │   │   ├── HistoryScreen.js      # 履歴一覧（Firestore統合、削除機能）
 │   │   ├── SessionDetailScreen.js # セッション詳細（フィードバック詳細表示）
-│   │   └── ProfileScreen.js      # プロフィール画面
+│   │   └── ProfileScreen.js      # プロフィール + 統計表示 ✅ Day 15拡張
 │   │
 │   ├── components/        # 再利用可能コンポーネント
-│   │   └── VoiceRecorder.js      # 音声録音 + 文字起こし
+│   │   ├── VoiceRecorder.js      # 音声録音 + 文字起こし
+│   │   └── StatisticsCard.js     # 統計情報表示カード ✅ Day 15
 │   │
 │   ├── services/          # 外部サービス連携
 │   │   ├── openaiService.js      # OpenAI API（質問生成・フィードバック）
 │   │   ├── speechService.js      # Whisper API（音声文字起こし）
-│   │   └── firestoreService.js   # Firestore CRUD操作
+│   │   ├── firestoreService.js   # Firestore CRUD操作
+│   │   └── statisticsService.js  # 統計データ取得・計算 ✅ Day 15
 │   │
 │   ├── constants/         # 定数
 │   │   ├── appConfig.js          # アプリ設定（質問数、文字数制限）
