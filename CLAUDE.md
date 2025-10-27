@@ -1,0 +1,871 @@
+# Business Communication Trainer - 開発ガイド (CLAUDE.md)
+
+**最終更新**: 2025年10月27日 (Day 13完了時点)
+**プロジェクト名**: Business Communication Trainer
+**リポジトリ**: https://github.com/fanta1127/business-communication-trainer/
+**ブランチ**: `day10-development-build`
+
+---
+
+## 📍 現在の状況
+
+### **進捗状況**
+- ✅ **Day 1-8**: Week 1完了（基盤構築）
+- ✅ **Day 9**: ゲストモード廃止 + フィードバックAPI統合
+- ✅ **Day 10**: Android Development Build
+- ✅ **Day 10.5**: iOS実機テスト環境構築
+- ✅ **Day 11**: 音声文字起こし機能（Whisper API）
+- ✅ **Day 12**: Firestoreデータモデル実装
+- ✅ **Day 13**: データ保存機能実装
+- ⏳ **Day 14**: 履歴機能実装（次回予定）
+
+### **最新コミット**
+```bash
+c12c1c2 - [feat] Day 13: データ保存機能実装
+b8e305b - [docs] Day 14用の開発コンテキストファイル作成
+```
+
+### **全体進捗**: 13/21日 (61.9%)
+
+---
+
+## 🏗️ プロジェクト構造
+
+```
+BusinessTrainer/
+├── src/
+│   ├── contexts/          # Context API（グローバル状態管理）
+│   │   ├── AuthContext.js        # 認証状態管理
+│   │   └── SessionContext.js     # セッション管理 + Firestore保存
+│   │
+│   ├── screens/           # 画面コンポーネント
+│   │   ├── LoginScreen.js        # ログイン画面
+│   │   ├── SignupScreen.js       # 新規登録画面
+│   │   ├── HomeScreen.js         # ホーム画面
+│   │   ├── SceneSelectionScreen.js  # 場面選択画面
+│   │   ├── PracticeScreen.js     # 練習画面（質問・回答）
+│   │   ├── FeedbackScreen.js     # フィードバック表示 + 保存
+│   │   ├── HistoryScreen.js      # 履歴一覧（Day 14実装予定）
+│   │   ├── SessionDetailScreen.js # セッション詳細（Day 14実装予定）
+│   │   └── ProfileScreen.js      # プロフィール画面
+│   │
+│   ├── components/        # 再利用可能コンポーネント
+│   │   └── VoiceRecorder.js      # 音声録音 + 文字起こし
+│   │
+│   ├── services/          # 外部サービス連携
+│   │   ├── openaiService.js      # OpenAI API（質問生成・フィードバック）
+│   │   ├── speechService.js      # Whisper API（音声文字起こし）
+│   │   └── firestoreService.js   # Firestore CRUD操作
+│   │
+│   ├── constants/         # 定数
+│   │   ├── appConfig.js          # アプリ設定（質問数、文字数制限）
+│   │   └── scenes.js             # 練習場面データ
+│   │
+│   ├── navigation/        # ナビゲーション
+│   │   └── AppNavigator.js       # メインナビゲーター
+│   │
+│   └── config/            # 設定ファイル
+│       └── firebase.js           # Firebase設定
+│
+├── functions/             # Firebase Cloud Functions
+│   ├── index.js                  # メイン関数
+│   └── package.json
+│
+├── .docs/                 # ドキュメント
+│   ├── 要件定義書.md
+│   ├── 開発コンテキストDay11.md
+│   ├── 開発コンテキストDay12.md
+│   ├── 開発コンテキストDay13.md
+│   └── 開発コンテキストDay14.md
+│
+├── .serena/               # Serena MCP設定
+│   ├── project.yml               # プロジェクト設定
+│   ├── cache/                    # 言語サーバーキャッシュ
+│   └── memories/                 # プロジェクトメモリー
+│
+├── App.js                 # エントリーポイント
+├── app.json               # Expo設定
+├── package.json
+├── firebase.json          # Firebase設定
+├── firestore.rules        # Firestoreセキュリティルール
+└── firestore.indexes.json # Firestoreインデックス
+```
+
+---
+
+## ✅ 実装済み機能
+
+### **1. 認証機能 (AuthContext.js)**
+
+**ファイル**: `src/contexts/AuthContext.js`
+
+**提供する値**:
+```javascript
+const {
+  user,              // 現在のユーザー (Firebase User | null)
+  loading,           // 認証状態チェック中フラグ
+  login,             // ログイン関数
+  signup,            // 新規登録関数
+  logout             // ログアウト関数
+} = useAuth();
+```
+
+**使用例**:
+```javascript
+// ログイン
+await login('email@example.com', 'password');
+
+// ユーザー情報取得
+if (user) {
+  console.log('UID:', user.uid);
+  console.log('Email:', user.email);
+}
+
+// ログアウト
+await logout();
+```
+
+**注意点**:
+- ゲストモードは完全廃止（Day 9）
+- 全機能がログイン必須
+
+---
+
+### **2. セッション管理 (SessionContext.js)**
+
+**ファイル**: `src/contexts/SessionContext.js`
+
+**提供する値**:
+```javascript
+const {
+  currentSession,           // 現在のセッションデータ
+  currentQuestionIndex,     // 現在の質問インデックス
+  isSessionActive,          // セッション進行中フラグ
+  startSession,             // セッション開始
+  saveAnswer,               // 回答保存
+  addAiQuestions,           // AI質問追加
+  moveToNextQuestion,       // 次の質問へ移動
+  saveFeedback,             // フィードバック保存
+  saveSessionToFirestore,   // Firestore保存（Day 13追加）
+  saving,                   // 保存中フラグ（Day 13追加）
+  saveError,                // 保存エラー（Day 13追加）
+  resetSession,             // セッションリセット
+  getCurrentQuestion,       // 現在の質問取得
+  isSessionComplete,        // セッション完了判定
+  getProgress               // 進捗率取得
+} = useSession();
+```
+
+**セッションデータ構造**:
+```javascript
+{
+  sessionId: "session_1234567890_abc123",
+  sceneId: "weekly-report",
+  sceneName: "週次報告会議",
+  timestamp: "2025-10-27T12:00:00.000Z",
+  qaList: [
+    {
+      questionId: "q0",
+      questionText: "今週の進捗を教えてください",
+      answerText: "ECサイトの決済機能を実装中です...",
+      answerDuration: 45,
+      isFixedQuestion: true
+    },
+    // ... AI生成質問3問
+  ],
+  totalQuestions: 4,
+  feedback: {
+    summary: "全体的に...",
+    goodPoints: [...],
+    improvementPoints: [...],
+    encouragement: "..."
+  },
+  duration: 180,        // 秒
+  startTime: 1234567890 // Date.now()
+}
+```
+
+**重要な実装パターン**:
+```javascript
+// ❌ 誤り: React Stateの非同期更新問題
+saveAnswer(answer);
+const hasNext = moveToNextQuestion();
+if (!hasNext) {
+  generateFeedback(currentSession.qaList); // まだ更新されていない可能性
+}
+
+// ✅ 正しい: 更新されたqaListを明示的に作成
+const updatedQaList = [...currentSession.qaList];
+updatedQaList[currentQuestionIndex] = {
+  ...updatedQaList[currentQuestionIndex],
+  answerText: answer,
+  answerDuration: duration,
+};
+saveAnswer(answer, duration);
+const hasNext = moveToNextQuestion();
+if (!hasNext) {
+  generateFeedback(updatedQaList); // 確実に更新されたデータ
+}
+```
+
+**Firestore保存**:
+```javascript
+try {
+  const sessionId = await saveSessionToFirestore();
+  console.log('保存成功:', sessionId);
+} catch (error) {
+  console.error('保存失敗:', error.message);
+  // リトライ処理
+}
+```
+
+---
+
+### **3. 音声録音・文字起こし (VoiceRecorder.js)**
+
+**ファイル**: `src/components/VoiceRecorder.js`
+
+**使用例**:
+```javascript
+<VoiceRecorder
+  onRecordingComplete={(transcribedText, duration) => {
+    console.log('文字起こし結果:', transcribedText);
+    console.log('録音時間:', duration, '秒');
+    setAnswer(transcribedText);
+  }}
+  disabled={isProcessing}
+/>
+```
+
+**処理フロー**:
+1. 録音開始 → expo-av で音声録音
+2. 録音停止 → m4aファイル保存
+3. Base64エンコード → Cloud Functions経由でWhisper API呼び出し
+4. 文字起こし結果取得 → コールバック実行
+
+**注意点**:
+- `expo-av` は SDK 54で非推奨（将来 `expo-audio` に移行予定）
+- Base64サイズ制限: 約500KB（約30秒の録音）
+- タイムアウト: 30秒
+
+---
+
+### **4. AI質問生成 (openaiService.js)**
+
+**ファイル**: `src/services/openaiService.js`
+
+**関数**: `generateQuestions(sceneId, userAnswer)`
+
+**使用例**:
+```javascript
+import { generateQuestions } from '../services/openaiService';
+
+const result = await generateQuestions('weekly-report', '進捗報告の回答テキスト');
+
+console.log(result.questions);
+// ['追加質問1', '追加質問2', '追加質問3']
+
+console.log(result.source);
+// 'AI' または 'DEFAULT'（フォールバック）
+```
+
+**処理フロー**:
+1. Cloud Functions呼び出し (`generateQuestions`)
+2. gpt-4o-mini モデルで3問生成
+3. タイムアウト時はデフォルト質問を返す
+
+**重要**: 引数が1つ（`sceneId`のみ）ではなく、2つ（`sceneId`, `userAnswer`）必要
+
+---
+
+### **5. フィードバック生成 (openaiService.js)**
+
+**ファイル**: `src/services/openaiService.js`
+
+**関数**: `generateFeedback(sceneId, sceneName, qaList)`
+
+**使用例**:
+```javascript
+import { generateFeedback } from '../services/openaiService';
+
+const feedbackResult = await generateFeedback(
+  'weekly-report',
+  '週次報告会議',
+  [
+    { questionText: '質問1', answerText: '回答1' },
+    { questionText: '質問2', answerText: '回答2' },
+    // ...
+  ]
+);
+
+console.log(feedbackResult.summary);
+console.log(feedbackResult.goodPoints);
+console.log(feedbackResult.improvementPoints);
+console.log(feedbackResult.encouragement);
+```
+
+**重要**: 引数が3つ（`sceneId`, `sceneName`, `qaList`）必要
+- Day 13でバグ修正: `sceneName`が抜けていた
+
+**フィードバック構造**:
+```javascript
+{
+  summary: "全体的に具体的な説明ができています...",
+  goodPoints: [
+    {
+      aspect: "具体性",
+      quote: "ECサイトの決済機能を実装中",
+      comment: "プロジェクト名を明確に示していて良い"
+    }
+  ],
+  improvementPoints: [
+    {
+      aspect: "論理構造",
+      original: "遅延しています",
+      improved: "予定より3日遅延していますが...",
+      reason: "影響範囲まで伝えると安心感を与えられます"
+    }
+  ],
+  encouragement: "素晴らしいスタートです！"
+}
+```
+
+---
+
+### **6. Firestore操作 (firestoreService.js)**
+
+**ファイル**: `src/services/firestoreService.js`
+
+**利用可能な関数**:
+```javascript
+import {
+  saveSession,              // セッション保存
+  getUserSessions,          // セッション一覧取得
+  getSession,               // 特定セッション取得
+  deleteSession,            // セッション削除
+  getSessionCount,          // セッション数取得
+  createUserProfile,        // ユーザープロファイル作成
+  getFirestoreErrorMessage  // エラーメッセージ変換
+} from '../services/firestoreService';
+```
+
+**使用例**:
+```javascript
+// セッション保存
+const sessionId = await saveSession(userId, sessionData);
+
+// セッション一覧取得（最新10件、createdAt降順）
+const sessions = await getUserSessions(userId, 10);
+
+// セッション削除
+await deleteSession(userId, sessionId);
+```
+
+**Firestoreパス**:
+```
+/users/{userId}/sessions/{sessionId}
+```
+
+**セキュリティルール**:
+- 自分のデータのみ読み書き可能
+- 認証必須
+
+---
+
+## 🎨 コーディングパターン
+
+### **1. Context API使用パターン**
+
+```javascript
+// ❌ 誤り
+import { SessionContext } from '../contexts/SessionContext';
+const session = useContext(SessionContext);
+
+// ✅ 正しい: カスタムフック使用
+import { useSession } from '../contexts/SessionContext';
+const { currentSession, saveAnswer } = useSession();
+```
+
+---
+
+### **2. 非同期処理パターン**
+
+```javascript
+// ✅ 正しい: try-catch + ローディング状態管理
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+
+const handleSubmit = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    await someAsyncFunction();
+
+    Alert.alert('成功', '処理が完了しました');
+  } catch (error) {
+    console.error('エラー:', error);
+    setError(error.message);
+    Alert.alert('エラー', error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+---
+
+### **3. ナビゲーションパターン**
+
+```javascript
+// 画面遷移
+navigation.navigate('ScreenName', { param: value });
+
+// 戻るボタンを非表示
+<Stack.Screen
+  name="Feedback"
+  component={FeedbackScreen}
+  options={{ headerLeft: null }}
+/>
+
+// セッションリセット後にホームへ
+resetSession();
+navigation.navigate('Home');
+```
+
+---
+
+### **4. エラーハンドリングパターン**
+
+```javascript
+// リトライ機能付きエラーハンドリング
+const handleSave = async (retryCount = 0) => {
+  const MAX_RETRIES = 2;
+
+  try {
+    await saveSessionToFirestore();
+    Alert.alert('保存完了', 'セッションを保存しました');
+  } catch (error) {
+    if (retryCount < MAX_RETRIES) {
+      Alert.alert(
+        '保存エラー',
+        `もう一度試しますか？`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: 'リトライ', onPress: () => handleSave(retryCount + 1) }
+        ]
+      );
+    } else {
+      Alert.alert('保存エラー', '保存に失敗しました');
+    }
+  }
+};
+```
+
+---
+
+## 🐛 トラブルシューティング
+
+### **問題1: フィードバック生成エラー**
+
+**症状**:
+```
+ERROR [OpenAI] qaListの形式が正しくありません
+```
+
+**原因**:
+- `generateFeedback`の引数不足（`sceneName`が抜けている）
+- React Stateの非同期更新により、`currentSession.qaList`がまだ更新されていない
+
+**解決策**:
+```javascript
+// ✅ 修正後
+const updatedQaList = [...currentSession.qaList];
+updatedQaList[currentQuestionIndex] = {
+  ...updatedQaList[currentQuestionIndex],
+  answerText: answer.trim(),
+  answerDuration: duration,
+};
+
+const feedbackResult = await generateFeedback(
+  currentSession.sceneId,
+  currentSession.sceneName,  // ✅ 追加
+  updatedQaList              // ✅ 更新されたデータ使用
+);
+```
+
+**修正コミット**: `c12c1c2` (Day 13)
+
+---
+
+### **問題2: Expo AV非推奨警告**
+
+**症状**:
+```
+WARN [expo-av]: Expo AV has been deprecated and will be removed in SDK 54.
+```
+
+**原因**: `expo-av` が SDK 54で非推奨
+
+**対応**:
+- 現在は影響なし（SDK 51使用中）
+- 将来的に `expo-audio` へ移行予定
+
+---
+
+### **問題3: Firebase Functions タイムアウト**
+
+**症状**:
+- AI質問生成が30秒でタイムアウト
+- フィードバック生成が45秒でタイムアウト
+
+**対応**:
+- フォールバック機能実装済み
+- デフォルト質問/フィードバックを返す
+- ユーザーには「デフォルト使用」を通知
+
+**設定ファイル**: `src/services/openaiService.js`
+```javascript
+const TIMEOUT_CONFIG = {
+  QUESTION_MS: 30000,   // 30秒
+  FEEDBACK_MS: 45000,   // 45秒
+};
+```
+
+---
+
+### **問題4: Android実機でのビルドエラー**
+
+**症状**: Development Buildが失敗
+
+**解決策**:
+- `eas.json`で正しいビルド設定
+- `google-services.json`を配置
+- Gradleキャッシュクリア
+
+**参考**: Day 10の開発コンテキスト
+
+---
+
+## 🔧 開発環境
+
+### **必要なツール**
+```bash
+Node.js: v18以上
+npm: v9以上
+Expo CLI: 最新版
+EAS CLI: 最新版（ビルド用）
+Android Studio: Android開発用
+Xcode: iOS開発用（Mac only）
+```
+
+### **環境構築手順**
+
+```bash
+# 1. リポジトリクローン
+git clone https://github.com/fanta1127/business-communication-trainer.git
+cd business-communication-trainer
+
+# 2. 依存関係インストール
+npm install
+
+# 3. Firebase設定
+# - src/config/firebase.js に設定追加
+# - google-services.json を配置（Android）
+# - GoogleService-Info.plist を配置（iOS）
+
+# 4. Cloud Functions依存関係インストール
+cd functions
+npm install
+cd ..
+
+# 5. 開発サーバー起動
+npx expo start
+
+# 6. デバイスでテスト
+# - Android: "a" キー押下
+# - iOS: "i" キー押下
+# - 実機: Expo Goアプリでスキャン
+```
+
+---
+
+### **ブランチ戦略**
+
+```
+main (本番)
+  └── day10-development-build (開発中) ← 現在ここ
+```
+
+**コミットメッセージ規約**:
+```
+[feat] 新機能追加
+[fix] バグ修正
+[refactor] リファクタリング
+[docs] ドキュメント更新
+[setup] 環境構築
+[test] テスト追加
+```
+
+---
+
+## 🧪 テスト方法
+
+### **手動テスト手順**
+
+#### **1. 認証テスト**
+```bash
+1. アプリ起動
+2. 新規登録 → メール認証
+3. ログアウト
+4. ログイン → 成功確認
+```
+
+#### **2. 練習セッションテスト**
+```bash
+1. ホーム画面 → 「練習を始める」
+2. 場面選択（例: 週次報告会議）
+3. 固定質問に音声で回答（または文字入力）
+4. AI質問3問に回答
+5. フィードバック画面表示確認
+```
+
+#### **3. データ保存テスト**
+```bash
+1. フィードバック画面で「履歴に保存」
+2. 保存完了アラート確認
+3. Firebase Console確認:
+   - Firestore → users/{userId}/sessions
+   - データ構造確認（qaList, feedback, duration）
+```
+
+---
+
+### **Firebase Console確認**
+
+1. **Firestore Database**:
+   ```
+   https://console.firebase.google.com/
+   → プロジェクト選択
+   → Firestore Database
+   → users/{userId}/sessions
+   ```
+
+2. **Cloud Functions ログ**:
+   ```
+   → Functions
+   → ログ確認
+   → エラーチェック
+   ```
+
+3. **Authentication**:
+   ```
+   → Authentication
+   → Users
+   → 登録ユーザー確認
+   ```
+
+---
+
+## 📊 重要な設計決定
+
+### **1. ゲストモード廃止（Day 9）**
+
+**理由**:
+- データ整合性向上
+- 実装簡素化
+- セキュリティ向上
+
+**影響**:
+- 全機能がログイン必須
+- SessionContextからゲスト関連コード削除
+- AppNavigatorの条件分岐簡素化
+
+---
+
+### **2. AI質問数を3問固定（v4.0）**
+
+**理由**:
+- UX予測性向上
+- プログレスバー正確化
+- 実装簡素化
+
+**設定**: `src/constants/appConfig.js`
+```javascript
+export const QUESTION_CONFIG = {
+  TOTAL_COUNT: 4,  // 固定質問1 + AI質問3
+  AI_COUNT: 3,
+};
+```
+
+---
+
+### **3. gpt-4o-mini採用**
+
+**理由**:
+- コスト最適化（gpt-4の約1/10）
+- 速度向上
+- 十分な品質
+
+**モデル**: `gpt-4o-mini`
+- 質問生成: 約3秒
+- フィードバック生成: 約5-10秒
+
+---
+
+### **4. Cloud Functions経由でAPI呼び出し**
+
+**理由**:
+- APIキーの秘匿化
+- セキュリティ強化
+- レート制限管理
+
+**実装**:
+```javascript
+// ❌ クライアント直接呼び出し（非推奨）
+const response = await openai.chat.completions.create({...});
+
+// ✅ Cloud Functions経由
+const generateQuestionsFunc = httpsCallable(functions, 'generateQuestions');
+const result = await generateQuestionsFunc({ sceneId, answer });
+```
+
+---
+
+## 📚 参考ドキュメント
+
+### **プロジェクト内ドキュメント**
+- `.docs/要件定義書.md` - プロジェクト仕様
+- `.docs/開発コンテキストDay11.md` - 音声文字起こし実装
+- `.docs/開発コンテキストDay12.md` - Firestoreデータモデル
+- `.docs/開発コンテキストDay13.md` - データ保存機能実装
+- `.docs/開発コンテキストDay14.md` - 履歴機能実装（次回予定）
+
+### **外部ドキュメント**
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Navigation](https://reactnavigation.org/)
+- [Firebase Documentation](https://firebase.google.com/docs)
+- [OpenAI API Reference](https://platform.openai.com/docs)
+
+---
+
+## 🚀 次のステップ（Day 14）
+
+### **実装予定**
+1. **HistoryScreen.js** - セッション一覧表示
+   - Pull to Refresh
+   - セッションカード表示
+   - 削除ボタン
+
+2. **SessionDetailScreen.js** - セッション詳細表示
+   - 質問と回答表示
+   - フィードバック再表示
+   - 削除機能
+
+3. **削除機能** - セッション削除
+   - 確認ダイアログ
+   - Firestore削除
+   - UI更新
+
+### **詳細**
+→ `.docs/開発コンテキストDay14.md` 参照
+
+---
+
+## 💡 開発のコツ
+
+### **1. デバッグ時のログ活用**
+```javascript
+console.log('[ComponentName] 説明:', data);
+console.error('[ComponentName] エラー:', error);
+console.warn('[ComponentName] 警告:', warning);
+```
+
+**例**: `[SessionContext] Session saved: abc123`
+
+---
+
+### **2. React DevToolsの活用**
+- Context値の確認
+- State変更の追跡
+- パフォーマンス分析
+
+---
+
+### **3. Firebase Consoleの活用**
+- Firestoreデータの確認
+- Cloud Functionsログの確認
+- Authenticationユーザーの確認
+
+---
+
+### **4. Gitコミットの粒度**
+- 1機能1コミット
+- 意味のある単位でコミット
+- コミットメッセージは明確に
+
+---
+
+## 🔐 セキュリティ
+
+### **APIキー管理**
+- ✅ OpenAI API Key → Cloud Functions環境変数
+- ✅ Firebase API Key → `src/config/firebase.js`（公開OK）
+- ❌ `.env`ファイルは使用しない（Expoの制約）
+
+### **Firestoreセキュリティルール**
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザーは自分のデータのみアクセス可能
+    match /users/{userId}/sessions/{sessionId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+---
+
+## 📞 サポート情報
+
+### **開発者情報**
+- GitHub: https://github.com/fanta1127
+- リポジトリ: https://github.com/fanta1127/business-communication-trainer/
+
+### **Firebase プロジェクト**
+- Project ID: `business-communication-trainer`
+- Region: `asia-northeast1`
+
+### **EAS ビルド情報**
+- Project ID: `d8957a17-7f57-454d-b344-0c7202fd1168`
+- Bundle ID: `com.fanta1127.businesstrainer`
+
+---
+
+## 📝 メモ・TODO
+
+### **既知の問題**
+- [ ] `expo-av` 非推奨（SDK 54で削除予定）
+- [ ] iOS Simulatorで音声録音不可（実機のみ）
+
+### **将来の改善**
+- [ ] `expo-av` → `expo-audio` 移行
+- [ ] オフライン対応
+- [ ] プッシュ通知
+- [ ] 統計・分析機能（Day 15-16）
+
+### **パフォーマンス最適化**
+- [ ] 画像の最適化
+- [ ] コンポーネントのメモ化（React.memo）
+- [ ] 不要な再レンダリング削減
+
+---
+
+**このファイルについて**:
+- このファイルはAI（Claude）と開発者の両方が参照するプロジェクトガイドです
+- 実装状況に応じて随時更新してください
+- 新しい学びやトラブルシューティングを追記してください
+
+**最終更新**: 2025年10月27日 (Day 13完了時点)
