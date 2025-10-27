@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ヘルパー関数
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // 認証済みかチェック
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 所有者かチェック
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // users コレクション
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    match /users/{userId} {
+      // 自分のプロファイルのみ読み書き可能
+      allow read, write: if isOwner(userId);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // sessions コレクション
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    match /sessions/{sessionId} {
+      // 読み取り: 認証済みかつ自分のセッション
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      // 作成: 認証済みかつuserIdが自分のID
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.keys().hasAll([
+                        'userId', 'sceneId', 'sceneName', 'qaList',
+                        'totalQuestions', 'createdAt', 'updatedAt'
+                      ]);
+
+      // 更新: 認証済みかつ自分のセッション
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+
+      // 削除: 認証済みかつ自分のセッション
+      allow delete: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid;
+    }
+  }
+}

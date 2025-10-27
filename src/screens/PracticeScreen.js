@@ -15,13 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/SessionContext';
 import VoiceRecorder from '../components/VoiceRecorder';
-import { generateQuestions } from '../services/openaiService';
-import { ANSWER_CONFIG, getQuestionNumber } from '../constants/appConfig';  // ✅ 追加
-
-// ❌ 削除: 定数定義（appConfigから取得）
-// const MIN_ANSWER_LENGTH = 10;
-// const MAX_ANSWER_LENGTH = 2000;
-// const WARNING_ANSWER_LENGTH = 1500;
+import { generateQuestions, generateFeedback } from '../services/openaiService';
+import { ANSWER_CONFIG, getQuestionNumber } from '../constants/appConfig';
 
 export default function PracticeScreen({ navigation, route }) {
   const { scene } = route.params || {};
@@ -32,6 +27,7 @@ export default function PracticeScreen({ navigation, route }) {
     saveAnswer,
     moveToNextQuestion,
     addAiQuestions,
+    saveFeedback,
     getProgress,
     resetSession,
   } = useSession();
@@ -42,28 +38,21 @@ export default function PracticeScreen({ navigation, route }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
-  // 現在の質問を取得
   const currentQuestion = getCurrentQuestion();
   const progress = getProgress();
   const totalQuestions = currentSession?.totalQuestions || 1;
 
-  // ✅ 定数使用: 文字数の状態を計算
   const answerLength = answer.length;
   const isAnswerTooLong = answerLength > ANSWER_CONFIG.MAX_LENGTH;
   const isAnswerNearLimit = answerLength >= ANSWER_CONFIG.WARNING_LENGTH;
   const isAnswerTooShort = answerLength > 0 && answerLength < ANSWER_CONFIG.MIN_LENGTH;
 
   useEffect(() => {
-    // 質問が変わったらタイマーをリセット
     setStartTime(Date.now());
     setAnswer('');
     setAudioUri(null);
   }, [currentQuestionIndex]);
 
-  /**
-   * 回答のバリデーション
-   * @returns {Object} { isValid: boolean, message: string }
-   */
   const validateAnswer = () => {
     const trimmedAnswer = answer.trim();
 
@@ -74,7 +63,6 @@ export default function PracticeScreen({ navigation, route }) {
       };
     }
 
-    // ✅ 定数使用
     if (trimmedAnswer.length < ANSWER_CONFIG.MIN_LENGTH) {
       return {
         isValid: false,
@@ -82,7 +70,6 @@ export default function PracticeScreen({ navigation, route }) {
       };
     }
 
-    // ✅ 定数使用
     if (trimmedAnswer.length > ANSWER_CONFIG.MAX_LENGTH) {
       return {
         isValid: false,
@@ -93,22 +80,17 @@ export default function PracticeScreen({ navigation, route }) {
     return { isValid: true, message: '' };
   };
 
-  /**
-   * 音声録音完了時の処理
-   */
-  const handleRecordingComplete = (uri, duration) => {
-    setAudioUri(uri);
-    console.log('録音完了:', { uri, duration });
+  const handleRecordingComplete = (transcribedText, duration) => {
+    if (transcribedText && transcribedText.trim().length > 0) {
+      setAnswer(transcribedText.trim());
+    }
 
-    // テキスト入力にフォーカスを促す
-    // 将来的にここで音声認識APIを呼び出す
+    if (duration > 0) {
+      setAudioUri(duration.toString());
+    }
   };
 
-  /**
-   * 次へボタンの処理
-   */
   const handleNext = async () => {
-    // バリデーション
     const validation = validateAnswer();
     if (!validation.isValid) {
       Alert.alert('入力エラー', validation.message);
@@ -118,67 +100,40 @@ export default function PracticeScreen({ navigation, route }) {
     setIsProcessing(true);
 
     try {
-      // 回答時間を計算（秒）
       const duration = Math.floor((Date.now() - startTime) / 1000);
-
-      // 固定質問かどうかチェック
       const currentQuestion = getCurrentQuestion();
       const isFixedQuestion = currentQuestion?.isFixedQuestion;
 
-      // 回答を保存
+      // 現在の回答を保存（更新されたqaListを作成）
+      const updatedQaList = [...currentSession.qaList];
+      updatedQaList[currentQuestionIndex] = {
+        ...updatedQaList[currentQuestionIndex],
+        answerText: answer.trim(),
+        answerDuration: duration,
+      };
+
       saveAnswer(answer.trim(), duration);
 
-
-
-      // 固定質問の場合、AI質問を生成
       if (isFixedQuestion) {
-        console.log('[PracticeScreen] 固定質問完了 - AI質問生成開始');
-
         setIsGeneratingQuestions(true);
-        setIsProcessing(false); // ローディング画面に移行するため一旦解除
+        setIsProcessing(false);
 
         try {
-          // AI質問生成
           const result = await generateQuestions(scene.id, answer.trim());
 
-          console.log('[PracticeScreen] AI質問生成成功:', result);
-
-          // 生成された質問をセッションに追加
-          console.log('addAiQuestions呼び出し前:', {
-            questionsLength: result.questions.length,
-            currentSessionExists: !!currentSession
-          });
           const updatedSession = await addAiQuestions(result.questions);
-          console.log('addAiQuestions呼び出し後（状態更新完了）', {
-            updatedQaListLength: updatedSession?.qaList?.length
-          });
 
-          // ソース情報を表示
           if (result.source === 'DEFAULT') {
             Alert.alert(
               'お知らせ',
               'AI質問の生成に失敗したため、デフォルト質問を使用します。\n\n引き続き練習を続けてください。',
               [{ text: 'OK' }]
             );
-          } else {
-            // AI生成成功の場合、簡単な通知
-            console.log('[PracticeScreen] AI質問が正常に生成されました');
           }
 
-          // 次の質問（AI質問1問目）へ
-          // 更新されたセッション情報を渡して判定
           const nextIndex = currentQuestionIndex + 1;
           if (updatedSession && nextIndex < updatedSession.qaList.length) {
-            moveToNextQuestion(updatedSession);  // 更新されたセッションを渡す
-            console.log('moveToNextQuestion実行（更新後のセッション使用）', {
-              nextIndex,
-              qaListLength: updatedSession.qaList.length
-            });
-          } else {
-            console.log('次の質問なし', {
-              nextIndex,
-              qaListLength: updatedSession?.qaList?.length
-            });
+            moveToNextQuestion(updatedSession);
           }
           setAnswer('');
 
@@ -210,33 +165,52 @@ export default function PracticeScreen({ navigation, route }) {
         }
 
       } else {
-        // AI質問への回答の場合
         const hasNext = moveToNextQuestion();
 
         if (!hasNext) {
-          // 全質問完了
-          Alert.alert(
-            '練習完了',
-            'お疲れ様でした！全ての質問への回答が完了しました。\n\nフィードバック機能は Week 2（Day 10-11）で実装予定です。',
-            [
-              {
-                text: 'ホームに戻る',
-                onPress: () => {
-                  resetSession();
-                  navigation.navigate('Home');
+          // 全質問完了 - フィードバック生成処理へ
+          console.log('[PracticeScreen] 全質問完了 - フィードバック生成開始');
+          console.log('[PracticeScreen] qaList:', JSON.stringify(updatedQaList, null, 2));
+
+          try {
+            // フィードバック生成API呼び出し（更新されたqaListを使用）
+            const feedbackResult = await generateFeedback(
+              currentSession.sceneId,
+              currentSession.sceneName,
+              updatedQaList
+            );
+
+            // フィードバックをセッションに保存
+            saveFeedback(feedbackResult);
+
+            // FeedbackScreen画面に遷移
+            navigation.navigate('Feedback');
+
+          } catch (error) {
+            console.error('[PracticeScreen] フィードバック生成エラー:', error);
+
+            Alert.alert(
+              'エラー',
+              'フィードバックの生成に失敗しました。\n\nもう一度お試しいただくか、後で再度確認してください。',
+              [
+                {
+                  text: 'ホームに戻る',
+                  onPress: () => {
+                    resetSession();
+                    navigation.navigate('Home');
+                  },
                 },
-              },
-              {
-                text: 'もう一度練習',
-                onPress: () => {
-                  resetSession();
-                  navigation.goBack();
+                {
+                  text: 'もう一度',
+                  onPress: () => {
+                    resetSession();
+                    navigation.goBack();
+                  },
                 },
-              },
-            ]
-          );
+              ]
+            );
+          }
         } else {
-          // 次のAI質問へ
           setAnswer('');
         }
       }
@@ -252,9 +226,6 @@ export default function PracticeScreen({ navigation, route }) {
     }
   };
 
-  /**
-   * セッション終了の確認
-   */
   const handleEndSession = () => {
     Alert.alert(
       'セッションを終了',
@@ -273,9 +244,6 @@ export default function PracticeScreen({ navigation, route }) {
     );
   };
 
-  /**
-   * 回答文字数の色を取得
-   */
   const getCharCountColor = () => {
     if (isAnswerTooLong) return '#FF5252';
     if (isAnswerNearLimit) return '#FF9800';
@@ -283,11 +251,7 @@ export default function PracticeScreen({ navigation, route }) {
     return '#999';
   };
 
-  /**
-   * 文字数の表示テキストを取得
-   */
   const getCharCountText = () => {
-    // ✅ 定数使用
     if (isAnswerTooLong) {
       return `${answerLength} / ${ANSWER_CONFIG.MAX_LENGTH} 文字（超過）`;
     }
@@ -345,7 +309,6 @@ export default function PracticeScreen({ navigation, route }) {
       >
         <View style={styles.header}>
           <View style={styles.progressContainer}>
-            {/* ✅ ユーティリティ関数使用（オプション） */}
             <Text style={styles.progressText}>
               質問 {getQuestionNumber(currentQuestionIndex)}
             </Text>
@@ -379,7 +342,6 @@ export default function PracticeScreen({ navigation, route }) {
             </Text>
           </View>
 
-          {/* 音声録音コンポーネント */}
           <VoiceRecorder
             onRecordingComplete={handleRecordingComplete}
             disabled={isProcessing}
@@ -400,7 +362,7 @@ export default function PracticeScreen({ navigation, route }) {
               numberOfLines={6}
               textAlignVertical="top"
               editable={!isProcessing}
-              maxLength={ANSWER_CONFIG.MAX_LENGTH + 100} 
+              maxLength={ANSWER_CONFIG.MAX_LENGTH} 
             />
             <Text style={[styles.charCount, { color: getCharCountColor() }]}>
               {getCharCountText()}

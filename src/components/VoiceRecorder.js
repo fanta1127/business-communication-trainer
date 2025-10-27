@@ -1,4 +1,6 @@
 // src/components/VoiceRecorder.js
+// Day 11: Whisper API統合版
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -7,31 +9,85 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import {
+  transcribeAudioWithWhisper,
+  isSpeechRecognitionAvailable,
+  getSpeechErrorMessage,
+} from '../services/speechService';
 
-/**
- * VoiceRecorderコンポーネント
- * 音声録音機能を提供（expo-av使用）
- * 
- * Props:
- * - onRecordingComplete: (audioUri, duration) => void - 録音完了時のコールバック
- * - disabled: boolean - ボタンの無効化
- */
 export default function VoiceRecorder({ onRecordingComplete, disabled = false }) {
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [permissionResponse, requestPermission] = Audio.usePermissions();
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [speechAvailable, setSpeechAvailable] = useState(true);
 
-  // アニメーション用の値
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnimLoopRef = useRef(null);
   const durationInterval = useRef(null);
+  const isStartingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const recordingRef = useRef(null);
+  const isTranscribingRef = useRef(false);
+  const didCompleteRef = useRef(false);
 
-  // 録音中のパルスアニメーション
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
+
+  useEffect(() => {
+    isTranscribingRef.current = isTranscribing;
+  }, [isTranscribing]);
+
+  useEffect(() => {
+    return () => {
+      (async () => {
+        try {
+          if (recordingRef.current) {
+            await recordingRef.current.stopAndUnloadAsync();
+          }
+        } catch (err) {
+          // クリーンアップ時のエラーは無視
+        }
+
+        try {
+          await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        } catch (err) {
+          // クリーンアップ時のエラーは無視
+        }
+      })();
+    };
+  }, []);
+
+  useEffect(() => {
+    checkSpeechAvailability();
+  }, []);
+
+  const checkSpeechAvailability = async () => {
+    const available = await isSpeechRecognitionAvailable();
+    setSpeechAvailable(available);
+  };
+
+  // 録音関連のステートを初期化するヘルパー関数
+  const resetRecordingState = () => {
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setIsTranscribing(false);
+  };
+
   useEffect(() => {
     if (isRecording) {
-      Animated.loop(
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.2,
@@ -44,9 +100,10 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      pulseAnimLoopRef.current = loop;
+      loop.start();
 
-      // 録音時間のカウント
       durationInterval.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
@@ -55,22 +112,29 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
       }
+      if (pulseAnimLoopRef.current) {
+        pulseAnimLoopRef.current.stop();
+      }
     }
 
     return () => {
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
       }
+      if (pulseAnimLoopRef.current) {
+        pulseAnimLoopRef.current.stop();
+      }
     };
   }, [isRecording]);
 
-  /**
-   * 録音を開始
-   */
   const startRecording = async () => {
+    if (isStartingRef.current || isRecording) {
+      return;
+    }
+    isStartingRef.current = true;
+
     try {
-      // マイク権限の確認
-      if (permissionResponse.status !== 'granted') {
+      if (!permissionResponse || permissionResponse.status !== 'granted') {
         const permission = await requestPermission();
         if (!permission.granted) {
           Alert.alert(
@@ -81,14 +145,12 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
         }
       }
 
-      // オーディオモードの設定
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
       });
 
-      // 録音開始
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -96,62 +158,124 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
       setRecording(recording);
       setIsRecording(true);
       setRecordingDuration(0);
-      console.log('録音を開始しました');
+
+      console.log('[VoiceRecorder] 録音開始');
+
     } catch (err) {
-      console.error('録音開始エラー:', err);
+      console.error('[VoiceRecorder] 録音開始エラー:', err);
       Alert.alert('エラー', '録音を開始できませんでした。もう一度お試しください。');
+    } finally {
+      isStartingRef.current = false;
     }
   };
 
-  /**
-   * 録音を停止
-   */
   const stopRecording = async () => {
     if (!recording) return;
 
+    if (didCompleteRef.current) {
+      return;
+    }
+
     try {
       setIsRecording(false);
+
+      // 録音を停止
       await recording.stopAndUnloadAsync();
       
-      // オーディオモードをリセット
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
       });
 
       const uri = recording.getURI();
       const duration = recordingDuration;
-      
+
       setRecording(null);
       setRecordingDuration(0);
 
-      console.log('録音完了:', { uri, duration });
+      console.log('[VoiceRecorder] 録音完了:', { uri, duration });
 
-      // 録音完了コールバック
-      if (onRecordingComplete && uri) {
-        onRecordingComplete(uri, duration);
+      // 文字起こし開始
+      if (uri && speechAvailable) {
+        setIsTranscribing(true);
+
+        try {
+          console.log('[VoiceRecorder] 文字起こし開始...');
+          
+          const text = await transcribeAudioWithWhisper(uri);
+
+          console.log('[VoiceRecorder] 文字起こし完了:', text);
+
+          // 成功時のアラート
+          Alert.alert(
+            '録音完了',
+            `${duration}秒の音声が録音され、文字起こしが完了しました。\n\nテキストを確認・編集してから次へ進んでください。`,
+            [{ text: 'OK' }]
+          );
+
+          // テキストを親コンポーネントに渡す
+          if (onRecordingComplete) {
+            didCompleteRef.current = true;
+            onRecordingComplete(text, duration);
+          }
+
+        } catch (transcribeError) {
+          console.error('[VoiceRecorder] 文字起こしエラー:', transcribeError);
+
+          // エラー時のアラート
+          Alert.alert(
+            '文字起こしエラー',
+            getSpeechErrorMessage(transcribeError),
+            [
+              {
+                text: 'キーボードで入力',
+                onPress: () => {
+                  if (onRecordingComplete) {
+                    didCompleteRef.current = true;
+                    onRecordingComplete('', duration);
+                  }
+                }
+              }
+            ]
+          );
+        } finally {
+          setIsTranscribing(false);
+        }
+      } else {
+        // 音声認識が利用できない場合
+        Alert.alert(
+          '録音完了',
+          `${duration}秒の音声が録音されました。\n\n文字起こし機能が利用できないため、テキストエリアに回答を入力してください。`,
+          [{ text: 'OK' }]
+        );
+
+        if (onRecordingComplete) {
+          didCompleteRef.current = true;
+          onRecordingComplete('', duration);
+        }
       }
 
-      Alert.alert(
-        '録音完了',
-        `${duration}秒の音声が録音されました。\n\n現在、音声からテキストへの自動変換機能は開発中です。テキストエリアに回答を入力してください。`,
-        [{ text: 'OK' }]
-      );
     } catch (err) {
-      console.error('録音停止エラー:', err);
+      console.error('[VoiceRecorder] 録音停止エラー:', err);
       Alert.alert('エラー', '録音の保存に失敗しました。');
-      setIsRecording(false);
-      setRecordingDuration(0);
+      resetRecordingState();
+    } finally {
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          didCompleteRef.current = false;
+        }
+      }, 300);
+      if (isMountedRef.current) {
+        setIsTranscribing(false);
+      }
     }
   };
 
-  /**
-   * 録音のキャンセル
-   */
   const cancelRecording = async () => {
     if (!recording) return;
 
     try {
       setIsRecording(false);
+
       await recording.stopAndUnloadAsync();
       
       await Audio.setAudioModeAsync({
@@ -160,17 +284,15 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
 
       setRecording(null);
       setRecordingDuration(0);
-      console.log('録音をキャンセルしました');
+
+      console.log('[VoiceRecorder] 録音キャンセル');
+
     } catch (err) {
-      console.error('録音キャンセルエラー:', err);
-      setIsRecording(false);
-      setRecordingDuration(0);
+      console.error('[VoiceRecorder] 録音キャンセルエラー:', err);
+      resetRecordingState();
     }
   };
 
-  /**
-   * 時間を MM:SS 形式でフォーマット
-   */
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -179,60 +301,85 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
 
   return (
     <View style={styles.container}>
-      {!isRecording ? (
-        // 録音開始ボタン
-        <TouchableOpacity
-          style={[styles.recordButton, disabled && styles.recordButtonDisabled]}
-          onPress={startRecording}
-          disabled={disabled}
-        >
-          <Text style={styles.recordButtonIcon}>🎤</Text>
-          <Text style={styles.recordButtonText}>音声で回答する</Text>
-          <Text style={styles.recordButtonHint}>タップして録音開始</Text>
-        </TouchableOpacity>
-      ) : (
-        // 録音中UI
-        <View style={styles.recordingContainer}>
-          <Animated.View
-            style={[
-              styles.recordingIndicator,
-              { transform: [{ scale: pulseAnim }] },
-            ]}
-          >
-            <View style={styles.recordingDot} />
-          </Animated.View>
-
-          <View style={styles.recordingInfo}>
-            <Text style={styles.recordingText}>録音中...</Text>
-            <Text style={styles.recordingDuration}>
-              {formatDuration(recordingDuration)}
-            </Text>
-          </View>
-
-          <View style={styles.recordingActions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={cancelRecording}
-            >
-              <Text style={styles.actionButtonText}>✕</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.stopButton]}
-              onPress={stopRecording}
-            >
-              <Text style={styles.actionButtonText}>⬛</Text>
-            </TouchableOpacity>
-          </View>
+      {/* 文字起こし中の表示 */}
+      {isTranscribing && (
+        <View style={styles.transcribingContainer}>
+          <ActivityIndicator size="large" color="#2196F3" />
+          <Text style={styles.transcribingTitle}>文字起こし中...</Text>
+          <Text style={styles.transcribingText}>
+            AIがあなたの音声をテキストに変換しています
+          </Text>
+          <Text style={styles.transcribingHint}>
+            30秒ほどお待ちください
+          </Text>
         </View>
       )}
 
-      <View style={styles.notice}>
-        <Text style={styles.noticeIcon}>ℹ️</Text>
-        <Text style={styles.noticeText}>
-          音声認識機能は開発中です。録音後、テキストで入力してください。
-        </Text>
-      </View>
+      {/* 録音ボタン/録音中UI（文字起こし中は非表示） */}
+      {!isTranscribing && (
+        <>
+          {!isRecording ? (
+            <TouchableOpacity
+              style={[styles.recordButton, disabled && styles.recordButtonDisabled]}
+              onPress={startRecording}
+              disabled={disabled}
+            >
+              <Text style={styles.recordButtonIcon}>🎤</Text>
+              <Text style={styles.recordButtonText}>音声で回答する</Text>
+              <Text style={styles.recordButtonHint}>
+                {speechAvailable 
+                  ? 'タップして録音＋自動文字起こし' 
+                  : 'タップして録音開始（文字起こし不可）'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.recordingContainer}>
+              <Animated.View
+                style={[
+                  styles.recordingIndicator,
+                  { transform: [{ scale: pulseAnim }] },
+                ]}
+              >
+                <View style={styles.recordingDot} />
+              </Animated.View>
+
+              <View style={styles.recordingInfo}>
+                <Text style={styles.recordingText}>録音中...</Text>
+                <Text style={styles.recordingDuration}>
+                  {formatDuration(recordingDuration)}
+                </Text>
+              </View>
+
+              <View style={styles.recordingActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={cancelRecording}
+                >
+                  <Text style={styles.actionButtonText}>✕</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.stopButton]}
+                  onPress={stopRecording}
+                >
+                  <Text style={styles.actionButtonText}>⬛</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.notice}>
+            <Text style={styles.noticeIcon}>
+              {speechAvailable ? '✅' : 'ℹ️'}
+            </Text>
+            <Text style={styles.noticeText}>
+              {speechAvailable 
+                ? '録音停止後、OpenAI Whisper APIで自動的に音声を文字起こしします。完了後、テキストを編集できます。'
+                : '音声認識が利用できません。録音後、テキストで入力してください。'}
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -267,6 +414,7 @@ const styles = StyleSheet.create({
   recordButtonHint: {
     fontSize: 12,
     color: '#999',
+    textAlign: 'center',
   },
   recordingContainer: {
     backgroundColor: '#fff',
@@ -322,6 +470,31 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 24,
     color: '#fff',
+  },
+  transcribingContainer: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  transcribingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  transcribingText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  transcribingHint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
   },
   notice: {
     flexDirection: 'row',

@@ -2,7 +2,9 @@
 
 const functions = require('firebase-functions');
 const axios = require('axios');
-const CONFIG = require('./config');  // ✅ 設定ファイルをインポート
+const FormData = require('form-data');
+const { z } = require('zod');
+const CONFIG = require('./config');
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // システムプロンプト定義
@@ -56,6 +58,70 @@ const FEEDBACK_SYSTEM_PROMPT = `あなたはビジネスコミュニケーショ
 }`;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Zodスキーマ定義（APIレスポンス検証用）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * 質問生成APIレスポンスのスキーマ
+ * OpenAI APIから返されるJSON形式を検証
+ * 注: AIが予期しないフィールドを追加する可能性があるため、
+ *     必要なフィールドのみを検証し、未知のフィールドは許可する
+ */
+const QuestionResponseSchema = z.object({
+  questions: z.array(
+    z.string()
+      .min(1, '質問は空文字列であってはなりません')
+      .max(500, '質問が長すぎます（最大500文字）')
+  ).min(CONFIG.QUESTION.AI_COUNT, `最低${CONFIG.QUESTION.AI_COUNT}個の質問が必要です`)
+    .max(10, '質問が多すぎます（最大10個）'),
+  reasoning: z.string().optional(), // AI の推論プロセス（オプション）
+  // その他のフィールド（totalQuestions等）はAIが追加する可能性があるため許可
+});
+
+/**
+ * フィードバック生成APIレスポンスのスキーマ
+ * 注: AIが予期しないフィールドを追加する可能性があるため、
+ *     必要なフィールドのみを検証し、未知のフィールドは許可する
+ */
+const FeedbackResponseSchema = z.object({
+  summary: z.string()
+    .min(1, '要約が必要です')
+    .max(500, '要約が長すぎます'),
+  goodPoints: z.array(
+    z.object({
+      aspect: z.string().min(1, '評価の観点が必要です'),
+      quote: z.string().optional(), // 引用はオプション
+      comment: z.string().min(1, 'コメントが必要です'),
+    })
+  ).min(1, '最低1つの良い点が必要です')
+    .max(5, '良い点が多すぎます'),
+  improvementPoints: z.array(
+    z.object({
+      aspect: z.string().min(1, '改善の観点が必要です'),
+      original: z.string().optional(), // 改善前の表現
+      improved: z.string().min(1, '改善後の表現が必要です'),
+      reason: z.string().min(1, '理由が必要です'),
+    })
+  ).min(1, '最低1つの改善点が必要です')
+    .max(5, '改善点が多すぎます'),
+  encouragement: z.string()
+    .min(1, '励ましの言葉が必要です')
+    .max(500, '励ましの言葉が長すぎます'),
+});
+
+/**
+ * Whisper API レスポンスのスキーマ
+ * 注: OpenAI APIは将来的にフィールドを追加する可能性があるため、
+ *     必要なフィールドのみを検証し、未知のフィールドは許可する
+ */
+const WhisperResponseSchema = z.object({
+  text: z.string().min(1, '文字起こしテキストが必要です'),
+  duration: z.number().optional(),
+  // usage: OpenAIが追加したフィールド（オプション、使用しない）
+  // その他の未知のフィールドも許可
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Cloud Functions
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -64,7 +130,7 @@ const FEEDBACK_SYSTEM_PROMPT = `あなたはビジネスコミュニケーショ
  * HTTPSコール可能な関数として公開
  */
 exports.generateQuestions = functions
-  .region(CONFIG.FIREBASE.REGION)  // ✅ 定数使用
+  .region(CONFIG.FIREBASE.REGION)
   .https.onCall(async (data, context) => {
 
     // 認証チェック
@@ -85,7 +151,6 @@ exports.generateQuestions = functions
       );
     }
 
-    // ✅ 定数使用
     if (userAnswer.trim().length < CONFIG.QUESTION.MIN_ANSWER_LENGTH) {
       throw new functions.https.HttpsError(
         'invalid-argument',
@@ -109,7 +174,6 @@ exports.generateQuestions = functions
     console.log(`[generateQuestions] User: ${userId}, Scene: ${sceneId}`);
 
     try {
-      // ✅ 定数使用: OpenAI API呼び出し
       const response = await axios.post(
         CONFIG.OPENAI.API_URL,
         {
@@ -142,23 +206,30 @@ exports.generateQuestions = functions
         throw new Error('Invalid API response structure');
       }
 
-      // JSONパース
-      const content = JSON.parse(response.data.choices[0].message.content);
-
-      // 質問配列の検証
-      if (!Array.isArray(content.questions) || content.questions.length === 0) {
-        throw new Error('No questions in API response');
+      // JSONパース（try-catchで安全に）
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(response.data.choices[0].message.content);
+      } catch (parseError) {
+        console.error('[generateQuestions] JSON parse error:', parseError.message);
+        throw new Error('OpenAI APIのレスポンスが不正なJSON形式です');
       }
 
-      // ✅ 定数使用: 質問数を厳密に制限
+      // Zodスキーマによる詳細な検証
+      let content;
+      try {
+        content = QuestionResponseSchema.parse(parsedContent);
+      } catch (validationError) {
+        console.error('[generateQuestions] Validation error:', validationError.errors);
+        // Zodのエラーメッセージをログに記録
+        const errorMessages = validationError.errors.map(err =>
+          `${err.path.join('.')}: ${err.message}`
+        ).join(', ');
+        throw new Error(`APIレスポンスの検証に失敗しました: ${errorMessages}`);
+      }
+
       const REQUIRED_COUNT = CONFIG.QUESTION.AI_COUNT;
       const questions = content.questions.slice(0, REQUIRED_COUNT);
-
-      if (questions.length < REQUIRED_COUNT) {
-        throw new Error(
-          `AI generated insufficient questions (expected ${REQUIRED_COUNT}, got ${questions.length})`
-        );
-      }
 
       if (content.questions.length > REQUIRED_COUNT) {
         console.warn(
@@ -171,7 +242,7 @@ exports.generateQuestions = functions
 
       return {
         questions,
-        totalQuestions: REQUIRED_COUNT,  // ✅ 定数使用（常に3）
+        totalQuestions: REQUIRED_COUNT,
         source: 'AI',
         reasoning: content.reasoning || '',
       };
@@ -208,7 +279,7 @@ exports.generateQuestions = functions
  * HTTPSコール可能な関数として公開
  */
 exports.generateFeedback = functions
-  .region(CONFIG.FIREBASE.REGION)  // ✅ 定数使用
+  .region(CONFIG.FIREBASE.REGION)
   .https.onCall(async (data, context) => {
 
     // 認証チェック
@@ -260,7 +331,6 @@ exports.generateFeedback = functions
       .join('\n\n');
 
     try {
-      // ✅ 定数使用: OpenAI API呼び出し
       const response = await axios.post(
         CONFIG.OPENAI.API_URL,
         {
@@ -276,7 +346,7 @@ exports.generateFeedback = functions
             },
           ],
           temperature: CONFIG.OPENAI.TEMPERATURE,
-          max_tokens: CONFIG.OPENAI.MAX_TOKENS_FEEDBACK,  // ✅ 定数使用
+          max_tokens: CONFIG.OPENAI.MAX_TOKENS_FEEDBACK,
           response_format: { type: 'json_object' },
         },
         {
@@ -284,7 +354,7 @@ exports.generateFeedback = functions
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${OPENAI_API_KEY}`,
           },
-          timeout: CONFIG.TIMEOUT.OPENAI_API_MS,  // ✅ 定数使用
+          timeout: CONFIG.TIMEOUT.OPENAI_API_MS,
         }
       );
 
@@ -293,17 +363,26 @@ exports.generateFeedback = functions
         throw new Error('Invalid API response structure');
       }
 
-      // JSONパース
-      const feedback = JSON.parse(response.data.choices[0].message.content);
-
-      // フィードバック構造の検証
-      if (!feedback.summary || !feedback.goodPoints || !feedback.improvementPoints || !feedback.encouragement) {
-        throw new Error('Invalid feedback structure');
+      // JSONパース（try-catchで安全に）
+      let parsedFeedback;
+      try {
+        parsedFeedback = JSON.parse(response.data.choices[0].message.content);
+      } catch (parseError) {
+        console.error('[generateFeedback] JSON parse error:', parseError.message);
+        throw new Error('OpenAI APIのレスポンスが不正なJSON形式です');
       }
 
-      // 配列の検証
-      if (!Array.isArray(feedback.goodPoints) || !Array.isArray(feedback.improvementPoints)) {
-        throw new Error('goodPoints and improvementPoints must be arrays');
+      // Zodスキーマによる詳細な検証
+      let feedback;
+      try {
+        feedback = FeedbackResponseSchema.parse(parsedFeedback);
+      } catch (validationError) {
+        console.error('[generateFeedback] Validation error:', validationError.errors);
+        // Zodのエラーメッセージをログに記録
+        const errorMessages = validationError.errors.map(err =>
+          `${err.path.join('.')}: ${err.message}`
+        ).join(', ');
+        throw new Error(`APIレスポンスの検証に失敗しました: ${errorMessages}`);
       }
 
       // 成功レスポンス
@@ -345,10 +424,155 @@ exports.generateFeedback = functions
   });
 
 /**
+ * 🆕 Day 11: 音声文字起こし Cloud Function
+ * OpenAI Whisper APIを使用して音声をテキストに変換
+ */
+exports.transcribeAudio = functions
+  .region(CONFIG.FIREBASE.REGION)
+  .runWith({
+    timeoutSeconds: 60,
+    memory: '512MB'
+  })
+  .https.onCall(async (data, context) => {
+
+    // 認証チェック
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'この機能を使用するにはログインが必要です'
+      );
+    }
+
+    // 入力バリデーション
+    const { audioBase64, format = 'm4a' } = data;
+
+    if (!audioBase64) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        '音声データが必要です'
+      );
+    }
+
+    // OpenAI APIキーの取得
+    const OPENAI_API_KEY = functions.config().openai?.key;
+
+    if (!OPENAI_API_KEY) {
+      console.error('[transcribeAudio] OpenAI APIキーが設定されていません');
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'OpenAI APIキーが設定されていません'
+      );
+    }
+
+    // ユーザー情報をログに記録
+    const userId = context.auth.uid;
+    console.log(`[transcribeAudio] User: ${userId}, Format: ${format}`);
+
+    try {
+      // Base64をBufferに変換
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      
+      console.log(`[transcribeAudio] Audio size: ${audioBuffer.length} bytes (${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+      // ファイルサイズチェック（25MB制限）
+      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+      if (audioBuffer.length > MAX_FILE_SIZE) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          `音声ファイルが大きすぎます（最大25MB、現在${(audioBuffer.length / 1024 / 1024).toFixed(2)}MB）`
+        );
+      }
+
+      // FormDataを作成
+      const formData = new FormData();
+      formData.append('file', audioBuffer, {
+        filename: `audio.${format}`,
+        contentType: `audio/${format}`
+      });
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'ja');
+
+      // Whisper APIに送信
+      console.log('[transcribeAudio] Sending to Whisper API...');
+      
+      const response = await axios.post(
+        'https://api.openai.com/v1/audio/transcriptions',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            ...formData.getHeaders()
+          },
+          timeout: 60000, // 60秒
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity
+        }
+      );
+
+      // Whisper APIレスポンスの検証
+      let validatedResponse;
+      try {
+        validatedResponse = WhisperResponseSchema.parse(response.data);
+      } catch (validationError) {
+        console.error('[transcribeAudio] Validation error:', validationError.errors);
+        const errorMessages = validationError.errors.map(err =>
+          `${err.path.join('.')}: ${err.message}`
+        ).join(', ');
+        throw new Error(`Whisper APIレスポンスの検証に失敗しました: ${errorMessages}`);
+      }
+
+      const transcribedText = validatedResponse.text;
+
+      console.log(`[transcribeAudio] Success: ${transcribedText.length} characters transcribed`);
+
+      // レスポンス返却
+      return {
+        text: transcribedText,
+        duration: validatedResponse.duration || null,
+        source: 'WHISPER'
+      };
+
+    } catch (error) {
+      console.error('[transcribeAudio] Error:', error.message);
+
+      // OpenAI APIエラーの場合
+      if (error.response) {
+        const status = error.response.status;
+        const errorData = error.response.data;
+        
+        console.error('[transcribeAudio] API Error:', status, errorData);
+
+        if (status === 401 || status === 403) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'OpenAI API認証エラー'
+          );
+        } else if (status === 429) {
+          throw new functions.https.HttpsError(
+            'resource-exhausted',
+            'リクエスト数が上限に達しました。しばらくしてから再試行してください。'
+          );
+        } else if (status === 413) {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            '音声ファイルが大きすぎます'
+          );
+        }
+      }
+
+      // その他のエラー
+      throw new functions.https.HttpsError(
+        'internal',
+        '音声の文字起こしに失敗しました: ' + error.message
+      );
+    }
+  });
+
+/**
  * API接続テスト用の関数（デバッグ用）
  */
 exports.checkOpenAIConnection = functions
-  .region(CONFIG.FIREBASE.REGION)  // ✅ 定数使用
+  .region(CONFIG.FIREBASE.REGION)
   .https.onCall(async (data, context) => {
 
     if (!context.auth) {
@@ -368,7 +592,6 @@ exports.checkOpenAIConnection = functions
     }
 
     try {
-      // ✅ 定数使用
       const response = await axios.post(
         CONFIG.OPENAI.API_URL,
         {

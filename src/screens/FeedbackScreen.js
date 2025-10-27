@@ -6,55 +6,101 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSession } from '../contexts/SessionContext';
 
-export default function FeedbackScreen({ navigation, route }) {
-  const { scene, answers } = route.params || {};
+export default function FeedbackScreen({ navigation }) {
+  const { currentSession, resetSession, saveSessionToFirestore, saving } = useSession();
 
-  // 仮のフィードバックデータ（後でAIが生成）
-  const feedback = {
-    summary: '全体的に具体的な説明ができており、良い報告でした。さらに改善できる点もいくつかあります。',
-    goodPoints: [
-      {
-        aspect: '具体性',
-        quote: 'ECサイトの決済機能を実装中',
-        comment: 'プロジェクト名を明確に示していて良い',
-      },
-      {
-        aspect: '問題認識',
-        quote: 'APIエラーで遅延',
-        comment: '課題を明確に把握できている',
-      },
-    ],
-    improvementPoints: [
-      {
-        aspect: '論理構造',
-        original: '遅延しています',
-        improved: '予定より3日遅延していますが、全体スケジュールへの影響は最小限です',
-        reason: '影響範囲まで伝えると安心感を与えられます',
-      },
-      {
-        aspect: '解決策の提示',
-        original: '対策を検討中です',
-        improved: 'API提供元に問い合わせ中で、明日までに回答を得る予定です',
-        reason: '具体的なアクションと期限を示すと信頼感が増します',
-      },
-    ],
-    encouragement: '素晴らしいスタートです！練習を重ねることで、さらに説得力のある報告ができるようになります。',
-  };
+  // セッションデータが存在しない場合の処理
+  if (!currentSession || !currentSession.feedback) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>フィードバックデータがありません</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              resetSession();
+              navigation.navigate('Home');
+            }}
+          >
+            <Text style={styles.primaryButtonText}>ホームに戻る</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const handleSaveSession = () => {
-    // セッションを保存（後で実装）
-    console.log('セッションを保存します');
-    navigation.navigate('History');
+  const feedback = currentSession.feedback;
+  const sceneName = currentSession.sceneName;
+
+  /**
+   * セッションを保存（リトライ機能付き）
+   */
+  const handleSaveSession = async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
+
+    try {
+      const sessionId = await saveSessionToFirestore();
+
+      Alert.alert(
+        '保存完了',
+        'セッションを保存しました。\n履歴から確認できます。',
+        [
+          {
+            text: '履歴を見る',
+            onPress: () => {
+              resetSession();
+              navigation.navigate('History');
+            },
+          },
+          {
+            text: 'OK',
+            style: 'cancel',
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('[FeedbackScreen] Save error:', error);
+
+      if (retryCount < MAX_RETRIES) {
+        // リトライを提案
+        Alert.alert(
+          '保存エラー',
+          `セッションの保存に失敗しました。\n\n${error.message}\n\nもう一度試しますか？`,
+          [
+            {
+              text: 'キャンセル',
+              style: 'cancel',
+            },
+            {
+              text: 'リトライ',
+              onPress: () => handleSaveSession(retryCount + 1),
+            }
+          ]
+        );
+      } else {
+        // 最大リトライ回数に達した
+        Alert.alert(
+          '保存エラー',
+          `セッションの保存に失敗しました。\n\n${error.message}\n\n後で履歴画面から再度保存できます。`,
+          [{ text: 'OK' }]
+        );
+      }
+    }
   };
 
   const handleRetry = () => {
+    resetSession();
     navigation.navigate('SceneSelection');
   };
 
   const handleBackToHome = () => {
+    resetSession();
     navigation.navigate('Home');
   };
 
@@ -63,18 +109,15 @@ export default function FeedbackScreen({ navigation, route }) {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>お疲れ様でした！</Text>
-          <Text style={styles.sceneIcon}>{scene?.icon || '📊'}</Text>
-          <Text style={styles.sceneName}>{scene?.name || '練習'}</Text>
+          <Text style={styles.sceneName}>{sceneName}の練習を完了しました</Text>
         </View>
 
         <View style={styles.content}>
-          {/* サマリー */}
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>総評</Text>
             <Text style={styles.summaryText}>{feedback.summary}</Text>
           </View>
 
-          {/* 良かった点 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>✅ 良かった点</Text>
             {feedback.goodPoints.map((point, index) => (
@@ -88,7 +131,6 @@ export default function FeedbackScreen({ navigation, route }) {
             ))}
           </View>
 
-          {/* 改善点 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>💡 改善のヒント</Text>
             {feedback.improvementPoints.map((point, index) => (
@@ -116,20 +158,23 @@ export default function FeedbackScreen({ navigation, route }) {
             ))}
           </View>
 
-          {/* 励まし */}
           <View style={styles.encouragementCard}>
             <Text style={styles.encouragementIcon}>🌟</Text>
             <Text style={styles.encouragementText}>{feedback.encouragement}</Text>
           </View>
         </View>
 
-        {/* アクションボタン */}
         <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.primaryButton}
+          <TouchableOpacity
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSaveSession}
+            disabled={saving}
           >
-            <Text style={styles.primaryButtonText}>履歴に保存</Text>
+            {saving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>📁 履歴に保存</Text>
+            )}
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -158,23 +203,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#4CAF50',
     padding: 24,
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 16,
-  },
-  sceneIcon: {
-    fontSize: 48,
     marginBottom: 8,
   },
   sceneName: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#fff',
+    opacity: 0.9,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   content: {
     padding: 16,
@@ -305,6 +359,23 @@ const styles = StyleSheet.create({
   },
   actions: {
     padding: 16,
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9E9E9E',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   primaryButton: {
     backgroundColor: '#2196F3',

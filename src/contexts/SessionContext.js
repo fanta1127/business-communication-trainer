@@ -1,34 +1,19 @@
-// src/contexts/SessionContext.js
-
 import React, { createContext, useState, useContext } from 'react';
-import { QUESTION_CONFIG } from '../constants/appConfig';  // ✅ 追加
+import { QUESTION_CONFIG } from '../constants/appConfig';
+import { saveSession } from '../services/firestoreService';
+import { useAuth } from './AuthContext';
 
-/**
- * セッションコンテキスト
- * 練習セッションの状態を管理（質問、回答、進捗など）
- */
 const SessionContext = createContext();
 
-/**
- * セッションプロバイダー
- * アプリ全体でセッション状態を共有する
- */
 export const SessionProvider = ({ children }) => {
-  // 現在のセッション全体のデータ
+  const { user } = useAuth();
   const [currentSession, setCurrentSession] = useState(null);
-  
-  // 現在の質問インデックス（0から始まる）
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  
-  // セッションが進行中かどうか
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
-  /**
-   * 新しいセッションを開始
-   * @param {Object} scene - 選択された場面データ
-   */
   const startSession = (scene) => {
-    // ✅ 総質問数を定数から計算（固定1問 + AI質問）
     const totalQuestions = QUESTION_CONFIG.TOTAL_COUNT;
     
     const newSession = {
@@ -37,7 +22,6 @@ export const SessionProvider = ({ children }) => {
       sceneName: scene.name,
       timestamp: new Date().toISOString(),
       qaList: [
-        // 最初は固定質問のみ
         {
           questionId: 'q0',
           questionText: scene.fixedQuestion,
@@ -46,7 +30,7 @@ export const SessionProvider = ({ children }) => {
           isFixedQuestion: true,
         },
       ],
-      totalQuestions, // ✅ 常に4（固定1 + AI3）
+      totalQuestions,
       feedback: null,
       duration: 0,
       startTime: Date.now(),
@@ -57,11 +41,6 @@ export const SessionProvider = ({ children }) => {
     setIsSessionActive(true);
   };
 
-  /**
-   * 現在の質問への回答を保存
-   * @param {string} answerText - 回答テキスト
-   * @param {number} duration - 回答にかかった時間（秒）
-   */
   const saveAnswer = (answerText, duration = 0) => {
     if (!currentSession) return;
 
@@ -79,95 +58,54 @@ export const SessionProvider = ({ children }) => {
   };
 
   /**
-   * AI生成の追加質問をセッションに追加
-   * @param {Array} questions - 生成された質問のリスト
-   * @returns {Promise<Object>} 更新されたセッション情報
+   * AI生成質問をセッションに追加し、次の質問に自動的に移動
+   * @param {string[]} questions - AI生成された質問の配列
    */
   const addAiQuestions = (questions) => {
-    console.log('addAiQuestions開始:', {
-      hasCurrentSession: !!currentSession,
-      questionsLength: questions?.length,
-      currentQaListLength: currentSession?.qaList?.length
-    });
-    
-    return new Promise((resolve) => {
-      setCurrentSession(prevSession => {
-        if (!prevSession) {
-          console.log('addAiQuestions: currentSessionがnullのため早期リターン');
-          resolve(null);
-          return prevSession;
-        }
+    setCurrentSession(prevSession => {
+      if (!prevSession) {
+        console.warn('[SessionContext] addAiQuestions: セッションが存在しません');
+        return prevSession;
+      }
 
-        const newQuestions = questions.map((questionText, index) => ({
-          questionId: `q${prevSession.qaList.length + index}`,
-          questionText,
-          answerText: '',
-          answerDuration: 0,
-          isFixedQuestion: false,
-        }));
+      const newQuestions = questions.map((questionText, index) => ({
+        questionId: `q${prevSession.qaList.length + index}`,
+        questionText,
+        answerText: '',
+        answerDuration: 0,
+        isFixedQuestion: false,
+      }));
 
-        const updatedQaList = [...prevSession.qaList, ...newQuestions];
-        
-        const updatedSession = {
-          ...prevSession,
-          qaList: updatedQaList,
-          // totalQuestionsは変更しない（startSessionで設定済み）
-        };
-        
-        console.log('addAiQuestions更新前:', {
-          originalQaListLength: prevSession.qaList.length,
-          newQuestionsLength: newQuestions.length,
-          updatedQaListLength: updatedQaList.length
-        });
-        
-        // 更新されたセッション情報を返す
-        setTimeout(() => {
-          console.log('addAiQuestions: 状態更新完了、Promise解決');
-          resolve(updatedSession);
-        }, 0);
-        
-        console.log('addAiQuestions: setCurrentSession実行完了');
-        
-        return updatedSession;
-      });
+      return {
+        ...prevSession,
+        qaList: [...prevSession.qaList, ...newQuestions],
+      };
     });
+
+    // 質問が追加されたので、次の質問（最初のAI質問）に移動
+    setCurrentQuestionIndex(prev => prev + 1);
   };
 
   /**
-   * 次の質問に進む
-   * @param {Object|null} sessionToUse - 使用するセッション情報（省略時はcurrentSessionを使用）
-   * @returns {boolean} 次の質問があればtrue、なければfalse
+   * 次の質問に移動
+   * @returns {boolean} 移動できた場合true、最後の質問の場合false
    */
-  const moveToNextQuestion = (sessionToUse = null) => {
-    const session = sessionToUse || currentSession;
-    if (!session) return false;
+  const moveToNextQuestion = () => {
+    if (!currentSession) {
+      console.warn('[SessionContext] moveToNextQuestion: セッションが存在しません');
+      return false;
+    }
 
     const nextIndex = currentQuestionIndex + 1;
-    
-    // 渡されたセッション情報（または現在のセッション）で判定
-    if (nextIndex < session.qaList.length) {
+
+    if (nextIndex < currentSession.qaList.length) {
       setCurrentQuestionIndex(nextIndex);
-      console.log('moveToNextQuestion成功:', {
-        prevIndex: currentQuestionIndex,
-        nextIndex,
-        qaListLength: session.qaList.length,
-        usedProvidedSession: !!sessionToUse
-      });
       return true;
     }
-    
-    console.log('moveToNextQuestion: 次の質問なし', {
-      nextIndex,
-      qaListLength: session.qaList.length,
-      usedProvidedSession: !!sessionToUse
-    });
+
     return false;
   };
 
-  /**
-   * フィードバックを保存
-   * @param {Object} feedback - AIが生成したフィードバック
-   */
   const saveFeedback = (feedback) => {
     if (!currentSession) return;
 
@@ -181,28 +119,18 @@ export const SessionProvider = ({ children }) => {
     });
   };
 
-  /**
-   * セッションを終了
-   */
   const endSession = () => {
     setCurrentSession(null);
     setCurrentQuestionIndex(0);
     setIsSessionActive(false);
   };
 
-  /**
-   * セッションをリセット（中断時など）
-   */
   const resetSession = () => {
     setCurrentSession(null);
     setCurrentQuestionIndex(0);
     setIsSessionActive(false);
   };
 
-  /**
-   * 現在の質問を取得
-   * @returns {Object|null} 現在の質問オブジェクト
-   */
   const getCurrentQuestion = () => {
     if (!currentSession || currentQuestionIndex >= currentSession.qaList.length) {
       return null;
@@ -210,38 +138,83 @@ export const SessionProvider = ({ children }) => {
     return currentSession.qaList[currentQuestionIndex];
   };
 
-  /**
-   * セッションが完了しているか確認
-   * @returns {boolean} 全質問に回答済みならtrue
-   */
   const isSessionComplete = () => {
     if (!currentSession) return false;
     
     return currentSession.qaList.every((qa) => qa.answerText.trim() !== '');
   };
 
-  /**
-   * 進捗率を計算
-   * @returns {number} 0-100の進捗率
-   */
   const getProgress = () => {
     if (!currentSession) return 0;
-    
+
     const answeredCount = currentSession.qaList.filter(
       (qa) => qa.answerText.trim() !== ''
     ).length;
-    
-    // ✅ 定数使用（より明確に）
+
     return Math.floor((answeredCount / QUESTION_CONFIG.TOTAL_COUNT) * 100);
   };
 
+  /**
+   * セッションをFirestoreに保存
+   * @returns {Promise<string>} 保存されたセッションID
+   */
+  const saveSessionToFirestore = async () => {
+    try {
+      setSaving(true);
+      setSaveError(null);
+
+      console.log('[SessionContext] Saving session to Firestore...');
+
+      // ユーザーチェック
+      if (!user || !user.uid) {
+        throw new Error('ログインが必要です');
+      }
+
+      // セッションデータチェック
+      if (!currentSession) {
+        throw new Error('保存するセッションがありません');
+      }
+
+      // セッションデータを準備
+      const sessionData = {
+        sceneId: currentSession.sceneId,
+        sceneName: currentSession.sceneName,
+        qaList: currentSession.qaList,
+        feedback: currentSession.feedback,
+        duration: currentSession.duration || 0,
+      };
+
+      // Firestoreに保存
+      const sessionId = await saveSession(user.uid, sessionData);
+
+      console.log('[SessionContext] Session saved successfully:', sessionId);
+
+      return sessionId;
+
+    } catch (error) {
+      console.error('[SessionContext] Save error:', error);
+
+      // エラーメッセージの分類
+      let userMessage = error.message;
+
+      if (error.message.includes('network') || error.message.includes('Network')) {
+        userMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+      } else if (error.message.includes('permission')) {
+        userMessage = 'データへのアクセス権限がありません。ログインしてください。';
+      }
+
+      setSaveError(userMessage);
+      throw new Error(userMessage);
+
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const value = {
-    // State
     currentSession,
     currentQuestionIndex,
     isSessionActive,
-    
-    // Actions
     startSession,
     saveAnswer,
     addAiQuestions,
@@ -249,11 +222,12 @@ export const SessionProvider = ({ children }) => {
     saveFeedback,
     endSession,
     resetSession,
-    
-    // Helpers
     getCurrentQuestion,
     isSessionComplete,
     getProgress,
+    saveSessionToFirestore,
+    saving,
+    saveError,
   };
 
   return (
@@ -263,9 +237,6 @@ export const SessionProvider = ({ children }) => {
   );
 };
 
-/**
- * SessionContextを使用するカスタムフック
- */
 export const useSession = () => {
   const context = useContext(SessionContext);
   if (!context) {
@@ -274,11 +245,6 @@ export const useSession = () => {
   return context;
 };
 
-/**
- * ユニークなセッションIDを生成
- * @returns {string} セッションID
- * 例: session_1234567890123_a1b2c3d4e
- */
 const generateSessionId = () => {
   return `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 };
