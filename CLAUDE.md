@@ -1,6 +1,6 @@
 # Business Communication Trainer - 開発ガイド (CLAUDE.md)
 
-**最終更新**: 2025年10月27日 (Day 13完了時点)
+**最終更新**: 2025年10月27日 (Day 14完了時点)
 **プロジェクト名**: Business Communication Trainer
 **リポジトリ**: https://github.com/fanta1127/business-communication-trainer/
 **ブランチ**: `day10-development-build`
@@ -17,15 +17,17 @@
 - ✅ **Day 11**: 音声文字起こし機能（Whisper API）
 - ✅ **Day 12**: Firestoreデータモデル実装
 - ✅ **Day 13**: データ保存機能実装
-- ⏳ **Day 14**: 履歴機能実装（次回予定）
+- ✅ **Day 14**: 履歴機能実装（Week 2完了！）
+- ⏳ **Day 15**: 統計・分析機能（次回予定）
 
 ### **最新コミット**
 ```bash
+3856689 - [feat] Day 14: 履歴機能実装
+e0ba2d2 - [docs] CLAUDE.md作成 - プロジェクト開発ガイド
 c12c1c2 - [feat] Day 13: データ保存機能実装
-b8e305b - [docs] Day 14用の開発コンテキストファイル作成
 ```
 
-### **全体進捗**: 13/21日 (61.9%)
+### **全体進捗**: 14/21日 (66.7%) - Week 2完了！
 
 ---
 
@@ -45,8 +47,8 @@ BusinessTrainer/
 │   │   ├── SceneSelectionScreen.js  # 場面選択画面
 │   │   ├── PracticeScreen.js     # 練習画面（質問・回答）
 │   │   ├── FeedbackScreen.js     # フィードバック表示 + 保存
-│   │   ├── HistoryScreen.js      # 履歴一覧（Day 14実装予定）
-│   │   ├── SessionDetailScreen.js # セッション詳細（Day 14実装予定）
+│   │   ├── HistoryScreen.js      # 履歴一覧（Firestore統合、削除機能）
+│   │   ├── SessionDetailScreen.js # セッション詳細（フィードバック詳細表示）
 │   │   └── ProfileScreen.js      # プロフィール画面
 │   │
 │   ├── components/        # 再利用可能コンポーネント
@@ -76,7 +78,8 @@ BusinessTrainer/
 │   ├── 開発コンテキストDay11.md
 │   ├── 開発コンテキストDay12.md
 │   ├── 開発コンテキストDay13.md
-│   └── 開発コンテキストDay14.md
+│   ├── 開発コンテキストDay14.md
+│   └── 開発コンテキストDay15.md
 │
 ├── .serena/               # Serena MCP設定
 │   ├── project.yml               # プロジェクト設定
@@ -369,6 +372,91 @@ await deleteSession(userId, sessionId);
 **セキュリティルール**:
 - 自分のデータのみ読み書き可能
 - 認証必須
+
+---
+
+### **7. 履歴機能 (HistoryScreen.js, SessionDetailScreen.js)**
+
+**実装状況**: ✅ Day 14完了
+
+#### **7.1 HistoryScreen - セッション一覧表示**
+
+**ファイル**: `src/screens/HistoryScreen.js`
+
+**主要機能**:
+- ✅ Firestore統合（getUserSessions）
+- ✅ Pull to Refresh（下にスワイプで更新）
+- ✅ 日時フォーマット（相対表示: 今日、昨日、○日前、月/日）
+- ✅ 削除機能（確認ダイアログ付き）
+- ✅ エラーハンドリング（loading, error, retry）
+- ✅ 空の状態表示
+
+**使用例**:
+```javascript
+// セッション一覧取得
+const fetchSessions = async () => {
+  const fetchedSessions = await getUserSessions(user.uid);
+  setSessions(fetchedSessions);
+};
+
+// Pull to Refresh
+const onRefresh = useCallback(() => {
+  setRefreshing(true);
+  fetchSessions();
+}, []);
+
+// 削除
+const handleDelete = async (sessionId) => {
+  await deleteSession(sessionId, user.uid);
+  setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+};
+```
+
+**日時フォーマット**:
+- 今日: `今日 15:30`
+- 昨日: `昨日 10:45`
+- 一週間以内: `3日前`
+- それ以前: `10/25`
+
+#### **7.2 SessionDetailScreen - セッション詳細表示**
+
+**ファイル**: `src/screens/SessionDetailScreen.js`
+
+**主要機能**:
+- ✅ 質問と回答の詳細表示（固定質問/AI質問区別）
+- ✅ フィードバック詳細表示:
+  - 総評
+  - ✅ 良かった点（aspect, quote, comment）
+  - 💡 改善のヒント（aspect, Before/After, reason）
+  - 🌟 励ましメッセージ
+- ✅ 削除機能（deleteSession呼び出し）
+- ✅ エラーハンドリング
+
+**データ構造対応**:
+```javascript
+// qaList
+{
+  questionText: "質問内容",
+  answerText: "回答内容",
+  isFixedQuestion: true,  // 固定質問の場合
+  answerDuration: 45
+}
+
+// feedback.goodPoints
+{
+  aspect: "具体性",
+  quote: "引用テキスト",
+  comment: "コメント"
+}
+
+// feedback.improvementPoints
+{
+  aspect: "論理構造",
+  original: "改善前",
+  improved: "改善後",
+  reason: "理由"
+}
+```
 
 ---
 
@@ -850,11 +938,16 @@ service cloud.firestore {
 - [ ] `expo-av` 非推奨（SDK 54で削除予定）
 - [ ] iOS Simulatorで音声録音不可（実機のみ）
 
+### **Week 3予定**
+- [ ] 統計・分析機能（Day 15-16）
+- [ ] UI/UX改善（Day 17-18）
+- [ ] 最終調整（Day 19-20）
+- [ ] 総仕上げ（Day 21）
+
 ### **将来の改善**
 - [ ] `expo-av` → `expo-audio` 移行
 - [ ] オフライン対応
 - [ ] プッシュ通知
-- [ ] 統計・分析機能（Day 15-16）
 
 ### **パフォーマンス最適化**
 - [ ] 画像の最適化
@@ -868,4 +961,4 @@ service cloud.firestore {
 - 実装状況に応じて随時更新してください
 - 新しい学びやトラブルシューティングを追記してください
 
-**最終更新**: 2025年10月27日 (Day 13完了時点)
+**最終更新**: 2025年10月27日 (Day 14完了時点 - Week 2完了！)
