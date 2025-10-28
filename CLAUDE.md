@@ -1,6 +1,6 @@
 # Business Communication Trainer - 開発ガイド (CLAUDE.md)
 
-**最終更新**: 2025年10月27日 (Day 15完了時点)
+**最終更新**: 2025年10月28日 (Day 15完了 + バグ修正)
 **プロジェクト名**: Business Communication Trainer
 **リポジトリ**: https://github.com/fanta1127/business-communication-trainer/
 **ブランチ**: `week3-development`
@@ -81,9 +81,9 @@ AI: 実装開始
 
 ### **最新コミット**
 ```bash
+45fe893 - [fix] Day 15: バグ修正と機能改善
+9ea5670 - [feat] Day 15: 統計・分析機能実装
 3856689 - [feat] Day 14: 履歴機能実装
-e0ba2d2 - [docs] CLAUDE.md作成 - プロジェクト開発ガイド
-c12c1c2 - [feat] Day 13: データ保存機能実装
 ```
 
 ### **全体進捗**: 15/21日 (71.4%) - Week 3開始！
@@ -140,7 +140,8 @@ BusinessTrainer/
 │   ├── 開発コンテキストDay12.md
 │   ├── 開発コンテキストDay13.md
 │   ├── 開発コンテキストDay14.md
-│   └── 開発コンテキストDay15.md
+│   ├── 開発コンテキストDay15.md
+│   └── 開発コンテキストDay16.md
 │
 ├── .serena/               # Serena MCP設定
 │   ├── project.yml               # プロジェクト設定
