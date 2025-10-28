@@ -27,12 +27,12 @@ export const QUESTION_CONFIG = {
   export const ANSWER_CONFIG = {
     /** 最小文字数 */
     MIN_LENGTH: 10,
-    
+
     /** 最大文字数 */
-    MAX_LENGTH: 2000,
-    
+    MAX_LENGTH: 5000,
+
     /** 警告文字数（最大の75%） */
-    WARNING_LENGTH: 1500,
+    WARNING_LENGTH: 3750,
   };
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

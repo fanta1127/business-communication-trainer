@@ -1,6 +1,7 @@
 // src/screens/ProfileScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { logOut } from '../services/authService';
 import { getUserStatistics, formatTotalDuration } from '../services/statisticsService';
@@ -12,28 +13,30 @@ export default function ProfileScreen() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
 
-  useEffect(() => {
-    const fetchStatistics = async () => {
-      if (!user?.uid) {
-        setStatsLoading(false);
-        return;
-      }
+  useFocusEffect(
+    useCallback(() => {
+      const fetchStatistics = async () => {
+        if (!user?.uid) {
+          setStatsLoading(false);
+          return;
+        }
 
-      try {
-        setStatsLoading(true);
-        setStatsError(null);
-        const stats = await getUserStatistics(user.uid);
-        setStatistics(stats);
-      } catch (error) {
-        console.error('[ProfileScreen] 統計取得エラー:', error);
-        setStatsError(error.message);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
+        try {
+          setStatsLoading(true);
+          setStatsError(null);
+          const stats = await getUserStatistics(user.uid);
+          setStatistics(stats);
+        } catch (error) {
+          console.error('[ProfileScreen] 統計取得エラー:', error);
+          setStatsError(error.message);
+        } finally {
+          setStatsLoading(false);
+        }
+      };
 
-    fetchStatistics();
-  }, [user]);
+      fetchStatistics();
+    }, [user])
+  );
 
   const handleLogout = () => {
     Alert.alert(

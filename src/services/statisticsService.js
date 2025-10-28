@@ -13,7 +13,8 @@ export const getUserStatistics = async (userId) => {
 
     // 全セッション取得
     const q = query(
-      collection(db, 'users', userId, 'sessions'),
+      collection(db, 'sessions'),
+      where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 

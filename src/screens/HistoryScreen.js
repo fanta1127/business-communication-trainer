@@ -1,5 +1,5 @@
 // src/screens/HistoryScreen.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserSessions, deleteSession } from '../services/firestoreService';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,12 +42,14 @@ export default function HistoryScreen({ navigation }) {
     }
   };
 
-  // 初回読み込み
-  useEffect(() => {
-    if (user?.uid) {
-      fetchSessions();
-    }
-  }, [user]);
+  // 画面フォーカス時に読み込み
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.uid) {
+        fetchSessions();
+      }
+    }, [user])
+  );
 
   // Pull to Refresh
   const onRefresh = useCallback(() => {
