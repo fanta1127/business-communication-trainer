@@ -176,6 +176,20 @@ export default function AppNavigator() {
     );
   }
 
-  // ユーザーがログインしている場合はメイン画面、それ以外は認証画面
-  return user ? <MainTabNavigator /> : <AuthNavigator />;
+  // ログインしていない場合は認証画面
+  if (!user) {
+    return <AuthNavigator />;
+  }
+
+  // ユーザーは存在するがdisplayNameがまだnullの場合（新規登録直後）
+  if (!user.displayName) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
+  }
+
+  // displayNameが設定済みの場合はメイン画面を表示
+  return <MainTabNavigator />;
 }

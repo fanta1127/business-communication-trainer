@@ -7,6 +7,7 @@ export const AuthContext = createContext({
   user: null,
   loading: true,
   logout: () => {},
+  refreshUser: () => {},
 });
 
 // カスタムフック: 認証状態を簡単に取得
@@ -26,14 +27,30 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Firebase Authentication の状態変更を監視
     const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser ? 'Logged in' : 'Logged out');
-      setUser(firebaseUser);
+      // 常に最新のユーザー情報を取得（updateProfile/reload後の更新を反映）
+      const { getCurrentUser } = require('../services/authService');
+      const currentUser = getCurrentUser();
+
+      setUser(currentUser);
       setLoading(false);
     });
 
     // クリーンアップ関数
     return () => unsubscribe();
   }, []);
+
+  // ユーザー情報を手動で更新する関数
+  const refreshUser = () => {
+    const { getCurrentUser } = require('../services/authService');
+    const currentUser = getCurrentUser();
+
+    // 新しいオブジェクトとして設定して確実に再レンダリングをトリガー
+    if (currentUser) {
+      setUser({ ...currentUser });
+    } else {
+      setUser(null);
+    }
+  };
 
   // ログアウト関数：認証状態をリセット
   const logout = async () => {
@@ -55,6 +72,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     logout,
+    refreshUser,
   };
 
   return (

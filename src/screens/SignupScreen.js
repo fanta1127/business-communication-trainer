@@ -13,8 +13,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { signUp } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SignupScreen({ navigation }) {
+  const { refreshUser } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -80,6 +82,10 @@ export default function SignupScreen({ navigation }) {
 
     try {
       await signUp(email.trim(), password, displayName.trim());
+
+      // AuthContextの状態を手動で更新（updateProfile/reload後の情報を反映）
+      refreshUser();
+
       // 成功時は自動的にAuthContextが更新され、ナビゲーションが切り替わる
       console.log('Signup successful');
       Alert.alert('成功', 'アカウントが作成されました！');

@@ -1,17 +1,25 @@
 // src/screens/HomeScreen.js
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  StyleSheet,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // 画面がフォーカスされた時にユーザー情報を更新
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
