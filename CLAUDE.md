@@ -1,6 +1,6 @@
 # Business Communication Trainer - 開発ガイド (CLAUDE.md)
 
-**最終更新**: 2025年10月28日 (Day 15完了 / Day 16スキップ決定)
+**最終更新**: 2025年10月29日 (新規登録時displayNameバグ修正完了)
 **プロジェクト名**: Business Communication Trainer
 **リポジトリ**: https://github.com/fanta1127/business-communication-trainer/
 **ブランチ**: `week3-development`
@@ -696,6 +696,89 @@ const TIMEOUT_CONFIG = {
 - Gradleキャッシュクリア
 
 **参考**: Day 10の開発コンテキスト
+
+---
+
+### **問題5: 新規登録時のdisplayName表示問題** ✅ 修正完了
+
+**症状**:
+- 新規登録直後、HomeScreenで「ようこそ、ユーザーさん！」と表示
+- 0.5秒後に「ようこそ、nakataさん！」に更新される
+- UXが不自然
+
+**原因**:
+1. `createUserWithEmailAndPassword`実行 → 認証完了（displayName: null）
+2. AppNavigatorが認証状態を検知 → **即座にHomeScreenへ遷移**
+3. バックグラウンドで`updateProfile()`実行 → displayName設定
+4. `reload()`実行 → ユーザー情報更新
+5. しかしHomeScreenは既にレンダリング済み → 「ユーザーさん」表示
+
+**根本的な問題**: `updateProfile()`は必ずしも`onAuthStateChanged`を再トリガーしない
+
+**解決策**:
+
+1. **authService.js**:
+```javascript
+import { reload } from 'firebase/auth';
+
+// updateProfile後にreload()実行
+await updateProfile(userCredential.user, { displayName });
+await reload(userCredential.user);
+```
+
+2. **AuthContext.js**:
+```javascript
+// refreshUser()関数を追加
+const refreshUser = () => {
+  const currentUser = getCurrentUser();
+  if (currentUser) {
+    setUser({ ...currentUser }); // 新しいオブジェクトとして設定
+  }
+};
+
+// onAuthStateChangedで常に最新情報を取得
+const currentUser = getCurrentUser();
+setUser(currentUser);
+```
+
+3. **SignupScreen.js**:
+```javascript
+await signUp(email, password, displayName);
+refreshUser(); // 手動で更新
+```
+
+4. **HomeScreen.js**:
+```javascript
+useFocusEffect(
+  React.useCallback(() => {
+    refreshUser(); // 画面フォーカス時に更新
+  }, [])
+);
+```
+
+5. **AppNavigator.js** (最重要):
+```javascript
+// displayNameがnullの場合はローディング画面を表示
+if (!user) return <AuthNavigator />;
+
+if (!user.displayName) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" color="#2196F3" />
+    </View>
+  );
+}
+
+return <MainTabNavigator />;
+```
+
+**結果**:
+- ✅ 新規登録後、ローディング画面を表示
+- ✅ `updateProfile`完了後にMainTabNavigatorへ遷移
+- ✅ HomeScreen表示時、最初から正しい名前が表示される
+- ✅ UXがクリーンで自然な流れに
+
+**修正コミット**: `c210231` (2025年10月29日)
 
 ---
 
