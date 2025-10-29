@@ -209,20 +209,48 @@ export default function HistoryScreen({ navigation }) {
   // 空の状態
   if (sessions.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <Ionicons name="folder-open-outline" size={64} color="#999" />
-          <Text style={styles.emptyText}>まだ練習履歴がありません</Text>
-          <Text style={styles.emptySubText}>
-            練習を完了してフィードバックを保存すると、{'\n'}
-            ここに履歴が表示されます
-          </Text>
-          <TouchableOpacity
-            style={styles.startButton}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.startButtonText}>練習を始める</Text>
-          </TouchableOpacity>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {/* 青いヘッダー（通常時と同じ） */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>練習履歴</Text>
+          <Text style={styles.headerSubtitle}>0件のセッション</Text>
+        </View>
+
+        {/* 空状態コンテンツ */}
+        <View style={styles.emptyStateContainer}>
+          {/* 空状態カード */}
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="calendar-outline" size={48} color="#2196F3" />
+            </View>
+
+            <Text style={styles.emptyTitle}>まだ練習履歴がありません</Text>
+            <Text style={styles.emptyDescription}>
+              練習を完了してフィードバックを保存すると、{'\n'}
+              ここに履歴が表示されます
+            </Text>
+
+            {/* 練習開始ボタン */}
+            <TouchableOpacity
+              style={styles.emptyActionButton}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Ionicons name="play-circle" size={20} color="#fff" />
+              <Text style={styles.emptyActionButtonText}>練習を始める</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ヒントカード */}
+          <View style={styles.emptyHintCard}>
+            <Text style={styles.emptyHintTitle}>💡 ヒント</Text>
+            <Text style={styles.emptyHintText}>
+              4つのビジネスシーンで練習できます：{'\n'}
+              • 週次報告会議{'\n'}
+              • プロジェクト提案{'\n'}
+              • 問題解決の議論{'\n'}
+              • 顧客へのプレゼン
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -393,6 +421,83 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  emptyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    marginBottom: 16,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    gap: 8,
+  },
+  emptyActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyHintCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  emptyHintTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  emptyHintText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
   },
   startButton: {
     marginTop: 24,
