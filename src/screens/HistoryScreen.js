@@ -218,6 +218,7 @@ export default function HistoryScreen({ navigation }) {
       </View>
 
       <FlatList
+        style={styles.flatListStyle}
         data={sessions}
         renderItem={renderSessionCard}
         keyExtractor={(item) => item.sessionId}
@@ -238,23 +239,26 @@ export default function HistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2196F3',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#2196F3',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  },
+  flatListStyle: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff',
+    opacity: 0.9,
   },
   centerContainer: {
     flex: 1,

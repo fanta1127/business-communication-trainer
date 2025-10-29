@@ -15,7 +15,10 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.welcomeSection}>
           <Text style={styles.title}>
             ようこそ、{user?.displayName || 'ユーザー'}さん！
@@ -25,7 +28,7 @@ export default function HomeScreen({ navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.startButton}
           onPress={() => {
             // SceneSelectionScreenへ遷移
@@ -53,64 +56,80 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2196F3',
+    backgroundColor: '#FFFFFF',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
   welcomeSection: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#FFFFFF',
     padding: 30,
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
+    color: '#666666',
+    fontWeight: '400',
   },
   startButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
     margin: 20,
+    marginTop: 32,
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  startButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  infoSection: {
+    backgroundColor: '#FFFFFF',
+    margin: 20,
+    marginTop: 0,
+    padding: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  infoSection: {
-    backgroundColor: '#fff',
-    margin: 20,
-    marginTop: 0,
-    padding: 20,
-    borderRadius: 12,
-  },
   infoTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    color: '#666666',
+    marginBottom: 12,
+    lineHeight: 20,
   },
   infoItem: {
     fontSize: 16,
-    color: '#333',
-    marginVertical: 5,
-    marginLeft: 10,
+    color: '#1A1A1A',
+    marginVertical: 6,
+    marginLeft: 8,
+    lineHeight: 24,
   },
 });
