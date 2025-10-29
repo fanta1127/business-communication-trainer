@@ -10,6 +10,8 @@ import {
   orderBy,
   limit,
   deleteDoc,
+  setDoc,
+  runTransaction,
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
@@ -131,15 +133,24 @@ export const deleteSession = async (sessionId, userId) => {
   try {
     console.log('[Firestore] Deleting session:', sessionId);
 
-    // セッションを取得して所有者確認
-    const session = await getSession(sessionId);
+    const docRef = doc(db, 'sessions', sessionId);
 
-    if (session.userId !== userId) {
-      throw new Error('このセッションを削除する権限がありません');
-    }
+    // トランザクションで取得と削除をアトミックに実行
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
 
-    // 削除実行
-    await deleteDoc(doc(db, 'sessions', sessionId));
+      if (!docSnap.exists()) {
+        throw new Error('セッションが見つかりません');
+      }
+
+      const sessionData = docSnap.data();
+
+      if (sessionData.userId !== userId) {
+        throw new Error('このセッションを削除する権限がありません');
+      }
+
+      transaction.delete(docRef);
+    });
 
     console.log('[Firestore] Session deleted:', sessionId);
 
@@ -187,6 +198,8 @@ export const createUserProfile = async (userId, userData) => {
   try {
     console.log('[Firestore] Creating user profile:', userId);
 
+    const docRef = doc(db, 'users', userId);
+
     const userProfile = {
       userId,
       email: userData.email,
@@ -199,9 +212,8 @@ export const createUserProfile = async (userId, userData) => {
       },
     };
 
-    // userIdをドキュメントIDとして使用
-    const docRef = doc(db, 'users', userId);
-    await addDoc(collection(db, 'users'), userProfile);
+    // userIdをドキュメントIDとして明示的に指定
+    await setDoc(docRef, userProfile);
 
     console.log('[Firestore] User profile created:', userId);
 

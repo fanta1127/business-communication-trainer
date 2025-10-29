@@ -162,10 +162,29 @@ export default function HistoryScreen({ navigation }) {
   // ローディング表示
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>履歴を読み込み中...</Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        {/* 青いヘッダー（スケルトン） */}
+        <View style={styles.header}>
+          <View style={styles.skeletonHeaderTitle} />
+          <View style={styles.skeletonHeaderSubtitle} />
+        </View>
+
+        {/* スケルトンカード */}
+        <View style={styles.skeletonListContainer}>
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={styles.skeletonCard}>
+              <View style={styles.skeletonCardContent}>
+                <View style={styles.skeletonCardHeader} />
+                <View style={styles.skeletonCardInfo} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* ローディングインジケーター（下部） */}
+        <View style={styles.skeletonLoadingIndicator}>
+          <ActivityIndicator size="small" color="#2196F3" />
+          <Text style={styles.skeletonLoadingText}>読み込み中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -259,6 +278,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     opacity: 0.9,
+  },
+  skeletonHeaderTitle: {
+    width: 120,
+    height: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonHeaderSubtitle: {
+    width: 80,
+    height: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+  },
+  skeletonListContainer: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  skeletonCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  skeletonCardContent: {
+    gap: 12,
+  },
+  skeletonCardHeader: {
+    width: '60%',
+    height: 18,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
+  skeletonCardInfo: {
+    width: '40%',
+    height: 14,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+  },
+  skeletonLoadingIndicator: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  skeletonLoadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
   centerContainer: {
     flex: 1,
