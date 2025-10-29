@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useSession } from '../contexts/SessionContext';
 
 export default function FeedbackScreen({ navigation }) {
@@ -47,23 +48,13 @@ export default function FeedbackScreen({ navigation }) {
     try {
       const sessionId = await saveSessionToFirestore();
 
-      Alert.alert(
-        '保存完了',
-        'セッションを保存しました。\n履歴から確認できます。',
-        [
-          {
-            text: '履歴を見る',
-            onPress: () => {
-              resetSession();
-              navigation.navigate('History');
-            },
-          },
-          {
-            text: 'OK',
-            style: 'cancel',
-          }
-        ]
-      );
+      Toast.show({
+        type: 'success',
+        text1: '保存完了 ✅',
+        text2: '履歴から確認できます',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error('[FeedbackScreen] Save error:', error);
 

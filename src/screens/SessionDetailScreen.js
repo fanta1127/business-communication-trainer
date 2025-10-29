@@ -66,12 +66,7 @@ export default function SessionDetailScreen({ navigation, route }) {
           onPress: async () => {
             try {
               await deleteSession(session.sessionId, user.uid);
-              Alert.alert('削除完了', 'セッションを削除しました。', [
-                {
-                  text: 'OK',
-                  onPress: () => navigation.goBack(),
-                },
-              ]);
+              navigation.goBack();
             } catch (error) {
               console.error('[SessionDetail] 削除エラー:', error);
               Alert.alert('削除エラー', error.message);

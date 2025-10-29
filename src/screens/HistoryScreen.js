@@ -79,8 +79,6 @@ export default function HistoryScreen({ navigation }) {
               setSessions(prevSessions =>
                 prevSessions.filter(session => session.sessionId !== sessionId)
               );
-
-              Alert.alert('削除完了', 'セッションを削除しました。');
             } catch (error) {
               console.error('[History] 削除エラー:', error);
               Alert.alert('削除エラー', error.message);

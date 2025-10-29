@@ -87,8 +87,6 @@ export default function SignupScreen({ navigation }) {
       refreshUser();
 
       // 成功時は自動的にAuthContextが更新され、ナビゲーションが切り替わる
-      console.log('Signup successful');
-      Alert.alert('成功', 'アカウントが作成されました！');
     } catch (error) {
       Alert.alert('登録失敗', error.message);
     } finally {

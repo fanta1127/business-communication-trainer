@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useSession } from '../contexts/SessionContext';
 import VoiceRecorder from '../components/VoiceRecorder';
 import { generateQuestions, generateFeedback } from '../services/openaiService';
@@ -124,11 +125,13 @@ export default function PracticeScreen({ navigation, route }) {
           const updatedSession = await addAiQuestions(result.questions);
 
           if (result.source === 'DEFAULT') {
-            Alert.alert(
-              'お知らせ',
-              'AI質問の生成に失敗したため、デフォルト質問を使用します。\n\n引き続き練習を続けてください。',
-              [{ text: 'OK' }]
-            );
+            Toast.show({
+              type: 'info',
+              text1: 'デフォルト質問を使用します',
+              text2: '引き続き練習を続けてください',
+              position: 'bottom',
+              visibilityTime: 3000,
+            });
           }
 
           const nextIndex = currentQuestionIndex + 1;

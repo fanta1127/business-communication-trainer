@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import Toast from 'react-native-toast-message';
 import {
   transcribeAudioWithWhisper,
   isSpeechRecognitionAvailable,
@@ -205,13 +206,6 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
 
           console.log('[VoiceRecorder] 文字起こし完了:', text);
 
-          // 成功時のアラート
-          Alert.alert(
-            '録音完了',
-            `${duration}秒の音声が録音され、文字起こしが完了しました。\n\nテキストを確認・編集してから次へ進んでください。`,
-            [{ text: 'OK' }]
-          );
-
           // テキストを親コンポーネントに渡す
           if (onRecordingComplete) {
             didCompleteRef.current = true;
@@ -242,11 +236,13 @@ export default function VoiceRecorder({ onRecordingComplete, disabled = false })
         }
       } else {
         // 音声認識が利用できない場合
-        Alert.alert(
-          '録音完了',
-          `${duration}秒の音声が録音されました。\n\n文字起こし機能が利用できないため、テキストエリアに回答を入力してください。`,
-          [{ text: 'OK' }]
-        );
+        Toast.show({
+          type: 'info',
+          text1: '録音完了 🎤',
+          text2: '文字起こし機能が利用できません。手動で入力してください。',
+          position: 'top',
+          visibilityTime: 4000,
+        });
 
         if (onRecordingComplete) {
           didCompleteRef.current = true;
