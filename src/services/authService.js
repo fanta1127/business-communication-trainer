@@ -1,11 +1,12 @@
 // src/services/authService.js
 //Firebaseの認証機能を「使いやすい関数群」にラップして、UI側（画面側）からシンプルに呼び出せるようにしたファイル
-import { 
+import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
-    updateProfile
+    updateProfile,
+    reload
   } from 'firebase/auth';
   import { auth } from './firebaseConfig';
   
@@ -25,8 +26,11 @@ import {
         await updateProfile(userCredential.user, {
           displayName: displayName
         });
+
+        // ユーザー情報を再読み込みしてAuthContextに反映
+        await reload(userCredential.user);
       }
-      
+
       return userCredential;
     } catch (error) {
       console.error('Sign up error:', error);
